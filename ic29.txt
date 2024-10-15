@@ -1798,6 +1798,16 @@ CTC programming command for clock chip
 0f10: 0fff 0fff 0fff 0fff 0fff 0fff 0fff 0fff
 0f20: 0fff 0fff 0fff 0fff 0fff 0fff 0fff 0fff
 
+// these are fed into the 8253 dividers to generate
+// reset pulses at the correct pitch for the oscillators
+// the DAC value sets the ramp current to get the correct
+// sawtooth slope
+// If you actually divide the clock rate by a value from
+// this table (4MHz, 2MHz, or 1MHz, for 4', 8', and 16'
+// respectively) you'll find that the note comes out a
+// little flat. This is because the "base pitch" is set
+// at $03ad to $1818 - 24 semitones and 256/24 cents.
+// this is corrected by the pitch interpolator
 0F30_noteClkDivTbl:
 0f30: f06e e2e9 d61f ca18 beba b404 a9e0 a052
 0f40: 974f 8ecc 86c5 7f33 780f 7151 6aef 64ee
