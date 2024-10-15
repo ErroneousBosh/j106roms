@@ -152,11 +152,11 @@ serial interrupt handler
 00a5: 74 88 10    ANAW    $FF10_noteGate     // AND it with the note flags
 00a8: 63 10       STAW    $FF10_noteGate     // save it back
 00aa: 55 1e 01    OFFIW   $FF1E_flags1,$01   // sustain?
-00ad: 4e 9a       JRE     $0149
-00af: 2b          LDAX    (HL)               // do the same to these flags
-00b0: 74 88 33    ANAW    $FF33_rlsPhase
-00b3: 63 33       STAW    $FF33_rlsPhase
-00b5: 4e 92       JRE     $0149
+00ad: 4e 9a       JRE     $0149              // yes, just exit
+00af: 2b          LDAX    (HL)               // no, set the voice to release
+00b0: 74 88 33    ANAW    $FF33_rlsPhase     // mask the bit
+00b3: 63 33       STAW    $FF33_rlsPhase     // store it back
+00b5: 4e 92       JRE     $0149              // exit
 
 handle a sustain message
 00b7: 77 86       EQI     A,$86              // sustain on
