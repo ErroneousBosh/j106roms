@@ -1101,19 +1101,19 @@ this seems to "de-click" turning on the modwheel
 0751: 48 83       LDEAX   (HL)
 0753: 70 1f 4b ff LBCD    $FF4B_lfoRateCoeff
 0757: 58 4a       BIT     0,$FF4A_lfoFlag // rise/fall
-0759: 4e 30       JRE     $078B
-075b: 74 b5       DSUBNB  EA,BC
-075d: 4e 3b       JRE     $079A
-075f: 48 95       STEAX   (HL++)
-0761: 59 4a       BIT     1,$FF4A_lfoFlag // polarity
-0763: 4e 3d       JRE     $07A2
-0765: b5          DMOV    BC,EA
-0766: 44 00 20    LXI     EA,$2000
-0769: 74 e5       DSUB    EA,BC
-076b: b5          DMOV    BC,EA
-076c: 58 37       BIT     0,$FF37_switch2
-076e: 14 ff 3f    LXI     BC,$3FFF
-0771: 01 47       LDAW    $FF47_pwmDepth
+0759: 4e 30       JRE     $078B             // rising value
+075b: 74 b5       DSUBNB  EA,BC             // no, falling - if it overflows...
+075d: 4e 3b       JRE     $079A             // jump ahead and zero the LFO value
+075f: 48 95       STEAX   (HL++)        // store LFO value, point to $FF4F
+0761: 59 4a       BIT     1,$FF4A_lfoFlag // polarity - if it's negative...
+0763: 4e 3d       JRE     $07A2             // add on $2000
+0765: b5          DMOV    BC,EA             // it's positive
+0766: 44 00 20    LXI     EA,$2000          //
+0769: 74 e5       DSUB    EA,BC             // subtract it from $2000
+076b: b5          DMOV    BC,EA             // now BC = $3fff - lfo, effectively (probably)
+076c: 58 37       BIT     0,$FF37_switch2   // fixed PWM
+076e: 14 ff 3f    LXI     BC,$3FFF          // yes, just set BC to $3fff
+0771: 01 47       LDAW    $FF47_pwmDepth    // multiply by PWM amount pot (limited to 0-100 by R5/R6)
 0773: 48 2f       MUL     C
 0775: 08          MOV     A,EAH
 0776: 1b          MOV     C,A
@@ -1121,25 +1121,25 @@ this seems to "de-click" turning on the modwheel
 0779: 48 2e       MUL     B
 077b: 70 43       EADD    EA,C
 077d: b5          DMOV    BC,EA
-077e: 44 ff 3f    LXI     EA,$3FFF
+077e: 44 ff 3f    LXI     EA,$3FFF          // subtract the result from $3fff
 0781: 74 e5       DSUB    EA,BC
 0783: 5e 1e       BIT     6,$FF1E_flags1     // square off/on
-0785: 44 00 00    LXI     EA,$0000
+0785: 44 00 00    LXI     EA,$0000          // square off? Just set PW to 0!
 0788: 48 93       STEAX   (HL)
 078a: de          JR      $07A9
-078b: 74 c5       DADD    EA,BC
-078d: 08          MOV     A,EAH
-078e: 47 e0       ONI     A,$E0
-0790: 4f cd       JRE     $075F
-0792: 44 ff 1f    LXI     EA,$1FFF
-0795: 20 4a       INRW    $FF4A_lfoFlag
-0797: 00          NOP     
-0798: 4f c5       JRE     $075F
-079a: 44 00 00    LXI     EA,$0000
-079d: 20 4a       INRW    $FF4A_lfoFlag
-079f: 00          NOP     
-07a0: 4f bd       JRE     $075F
-07a2: 14 00 20    LXI     BC,$2000
+078b: 74 c5       DADD    EA,BC             // increment LFO
+078d: 08          MOV     A,EAH             
+078e: 47 e0       ONI     A,$E0             // if EA < $2000
+0790: 4f cd       JRE     $075F             // jump back to store
+0792: 44 ff 1f    LXI     EA,$1FFF          // otherwise clamp to $1fff
+0795: 20 4a       INRW    $FF4A_lfoFlag     // bump the flag to say we're descending again
+0797: 00          NOP                       // inrw might skip, so place a NOP 
+0798: 4f c5       JRE     $075F             // jump back and store
+079a: 44 00 00    LXI     EA,$0000          // lfo value went below zero (overflowed) so zero it
+079d: 20 4a       INRW    $FF4A_lfoFlag     // bump the flag
+079f: 00          NOP                       // inrw might skip, so place a NOP
+07a0: 4f bd       JRE     $075F             // jump bank and store
+07a2: 14 00 20    LXI     BC,$2000          //
 07a5: 74 c5       DADD    EA,BC
 07a7: 4f c2       JRE     $076B
 07a9: 34 39 ff    LXI     HL,$FF39_noiseLevel
