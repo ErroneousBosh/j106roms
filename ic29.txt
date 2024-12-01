@@ -1,4 +1,4 @@
-isassembly of voice.bin, 4096 bytes [0x0 to 0x0fff]
+// Disassembly of voice.bin, 4096 bytes [0x0 to 0x0fff]
 0000: 54 80 02    JMP     $0280
 0003: 00          NOP   
 
@@ -650,7 +650,7 @@ set sub osc level
 
 now set the oscillator pitches
 0413: 71 0f 00    MVIW    $FF0F_voicePtr,$00     // first voice
-0416: 71 34 01    MVIW    $FF34_activeVoiceBit,$01              // voice selector bit
+0416: 71 34 01    MVIW    $FF34_actvVoiceBit,$01 // voice selector bit
 0419: 24 71 ff    LXI     DE,$FF71_notePitchFrac // first notepitch amount
 041c: 48 84       LDEAX   (DE++)                 // EA contains pitch, bump DE
 041e: 70 1f 6f ff LBCD    $FF6F_tuneLfoBend      // precalculated pitch offest
@@ -688,7 +688,7 @@ now set the oscillator pitches
 0458: 74 e5       DSUB    EA,BC                  // I think the interpolate value is negative, subtract
 045a: 01 0f       LDAW    $FF0F_voicePtr         // which voice?
 045c: 1a          MOV     B,A
-045d: 01 34       LDAW    $FF34_activeVoiceBit                  // voice bit
+045d: 01 34       LDAW    $FF34_actvVoiceBit     // voice bit
 045f: 74 d8 00    OFFAW   $FF00_resetVoiceBits   // does it need reset
 0462: 4e 4f       JRE     $04B3                  // yes, reset it
 0464: ba          DI                             // this could go squint if an interrupt happens right now
@@ -721,11 +721,11 @@ now set the oscillator pitches
 048b: 48 a4       DSLL    EA
 048d: 48 a4       DSLL    EA                     // left align it for the DAC
 048f: 01 0f       LDAW    $FF0F_voicePtr         // pick up the voice number
-0491: 78 2f       CALF    $082F_loadDac        // send it to the DAC
+0491: 78 2f       CALF    $082F_loadDac          // send it to the DAC
 0493: 64 08 ef    ANI     PA,$EF                 // IC24 VCO Ramp CV mux
-0496: 01 34       LDAW    $FF34_activeVoiceBit                  // voice bit
+0496: 01 34       LDAW    $FF34_actvVoiceBit     // voice bit
 0498: 48 25       SLL     A                      // move to next voice
-049a: 63 34       STAW    $FF34_activeVoiceBit                  // save it back
+049a: 63 34       STAW    $FF34_actvVoiceBit                  // save it back
 049c: 20 0f       INRW    $FF0F_voicePtr         // next voice
 049e: 75 0f 06    EQIW    $FF0F_voicePtr,$06     // done all six?
 04a1: 4f 79       JRE     $041C                  // no, go back again
@@ -779,12 +779,12 @@ calculate VCF amounts
 04f3: 71 6a 01    MVIW    $FF6A_vcfOverflow1,$01     // ... and flagging underflow
 04f6: b4          PUSH    EA                         // EA = Cutoff knob + LFO + bend
 04f7: 71 0f 00    MVIW    $FF0F_voicePtr,$00         // first voice
-04fa: 71 34 01    MVIW    $FF34_activeVoiceBit,$01
+04fa: 71 34 01    MVIW    $FF34_actvVoiceBit,$01
 04fd: 34 71 ff    LXI     HL,$FF71_notePitchFrac     // first note and fractional pitch
 0500: 24 25 ff    LXI     DE,$FF25_envRlsCoeff       // wonder why they did it this way
 0503: b3          PUSH    HL                         // save address on stack
 0504: 48 8b 02    LDEAX   (DE+$02)                   // fetch envelope for voice
-0507: 01 34       LDAW    $FF34_activeVoiceBit       // voice bit selector
+0507: 01 34       LDAW    $FF34_actvVoiceBit         // voice bit selector
 0509: 74 c8 11    ONAW    $FF11_voiceRun             // is it running?
 050c: 4e 2a       JRE     $0538
 050e: 74 c8 33    ONAW    $FF33_rlsPhase             // is it in release phase?
@@ -832,7 +832,7 @@ calculate decay phase for envelope
 0561: 4e 2d       JRE     $0590
 //
 attack phase
-0563: 01 34       LDAW    $FF34_activeVoiceBit
+0563: 01 34       LDAW    $FF34_actvVoiceBit
 0565: 16 ff       XRI     A,$FF
 0567: 74 88 08    ANAW    $FF08_dcyPhase
 056a: 63 08       STAW    $FF08_dcyPhase             // mask off decay bit
@@ -847,10 +847,10 @@ attack phase
 057c: 47 c0       ONI     A,$C0                      // EA > 0x3fff?
 057e: d1          JR      $0590                      // no, continue
 057f: 44 ff 3f    LXI     EA,$3FFF                   // clamp to maximum
-0582: 01 34       LDAW    $FF34_activeVoiceBit       // this voice...
+0582: 01 34       LDAW    $FF34_actvVoiceBit       // this voice...
 0584: 74 98 33    ORAW    $FF33_rlsPhase             // now has the release phase
 0587: 63 33       STAW    $FF33_rlsPhase
-0589: 01 34       LDAW    $FF34_activeVoiceBit
+0589: 01 34       LDAW    $FF34_actvVoiceBit
 058b: 74 98 08    ORAW    $FF08_dcyPhase             // and decay phase bits set
 058e: 63 08       STAW    $FF08_dcyPhase
 go on to do next envelope
@@ -873,7 +873,7 @@ envelope/gate settings
 05ac: 78 2f       CALF    $082F_loadDac
 05ae: 64 08 bf    ANI     PA,$BF                     // IC26 VCA CV mux
 05b1: ce          JR      $05C0
-05b2: 01 34       LDAW    $FF34_activeVoiceBit
+05b2: 01 34       LDAW    $FF34_actvVoiceBit
 05b4: 48 21       SLR     A
 05b6: 44 ff 3f    LXI     EA,$3FFF
 05b9: 74 c8 11    ONAW    $FF11_voiceRun
@@ -954,9 +954,9 @@ subtract envelope from base VCF
 063c: 01 0f       LDAW    $FF0F_voicePtr             // DAC channel
 063e: 78 2f       CALF    $082F_loadDac
 0640: 64 08 df    ANI     PA,$DF                     // IC23 VCF CV mux
-0643: 01 34       LDAW    $FF34_activeVoiceBit       // next voice bit
+0643: 01 34       LDAW    $FF34_actvVoiceBit         // next voice bit
 0645: 48 25       SLL     A
-0647: 63 34       STAW    $FF34_activeVoiceBit
+0647: 63 34       STAW    $FF34_actvVoiceBit
 0649: 20 0f       INRW    $FF0F_voicePtr             // next voice
 064b: 75 0f 06    EQIW    $FF0F_voicePtr,$06         // have we done six?
 064e: 54 03 05    JMP     $0503                      // no, loop

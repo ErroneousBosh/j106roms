@@ -1,4 +1,4 @@
-Disassembly of assigner.bin, 4096 bytes [0x0 to 0x0fff]
+// Disassembly of assigner.bin, 4096 bytes [0x0 to 0x0fff]
 coldstart
 0000: 4e 9a       JRE     $009C
 0002: 00          NOP     
@@ -32,25 +32,25 @@ serial handler
 002e: 00          NOP     
 002f: 00          NOP     
 
-table of values referenced at 0x088c
-likely to be something to do with
-patch data addresses
+// table of values referenced at 0x088c
+// likely to be something to do with
+// patch data addresses
 0030: 9c 97 94 90 9d 9a 95 93
 0038: 9e 98 96 91 9b 99 9f 92
 
-LED code numbers for numbers " 1" to "16"
-used for MIDI channel display
+// LED code numbers for numbers " 1" to "16"
+// used for MIDI channel display
 0040: f1 f2 f3 f4 f5 f6 f7 f8
 0048: f9 1a 11 12 13 14 15 16
 
-LED bitfield table for symbols
-<top bar> 1 2 3 4 5 6 7
+// LED bitfield table for symbols
+// <top bar> 1 2 3 4 5 6 7
 8 9 0 c E P r <space>
 0050: 01 60 c7 e5 6c ad af e8
 0058: ef ed eb 07 8f ce 07 00
 
-LED bitfield table for transpose values
-25 in total
+// LED bitfield table for transpose values
+// 25 in total
 C C. d d. E F F. G G. A A. B
 0060: 8b 9b 67 77 8f 8e 9e ab
 0068: bb ee fe 2f 8b 9b 67 77
@@ -75,7 +75,7 @@ start of code proper
 0098: 7b 81       CALF    $0b81_clrVoiceTbl
 009a: 4e 71       JRE     $010D
 
-startup
+// startup
 009c: 69 0e       MVI     A,$0E          // RAM on, 16kB mode, PF6-7 port mode
 009e: 4d d0       MOV     MM,A           // set memory map
 00a0: 69 0e       MVI     A,$0E          // serial mode clock 24x prescale, RX and TX on
@@ -409,7 +409,7 @@ set up testmode
 02eb: 01 bb       LDAW    $FFBB_patch
 02ed: 74 98 ba    ORAW    $FFBA_bank
 02f0: 1b          MOV     C,A
-02f1: 7c d0       CALF    $0CD0
+02f1: 7c d0       CALF    $0cd0_changePatch
 02f3: 7c 93       CALF    $0C93
 02f5: 55 a8 10    OFFIW   $FFA8_midiSwitch,$10 (MIDI Func2)
 02f8: 79 29       CALF    $0929
@@ -454,7 +454,7 @@ set up testmode
 0347: 74 98 ba    ORAW    $FFBA_bank
 034a: 7d 45       CALF    $0D45_digitLookup
 034c: 7c 3c       CALF    $0C3C
-034e: 7c d0       CALF    $0CD0
+034e: 7c d0       CALF    $0cd0_changePatch
 0350: 7c 93       CALF    $0C93
 0352: 55 a8 10    OFFIW   $FFA8_midiSwitch,$10 (MIDI Func2)
 0355: 79 29       CALF    $0929
@@ -490,7 +490,7 @@ set up testmode
 0391: 74 98 bb    ORAW    $FFBB_patch
 0394: 7d 45       CALF    $0D45_digitLookup
 0396: 7c 3c       CALF    $0C3C
-0398: 7c d0       CALF    $0CD0
+0398: 7c d0       CALF    $0cd0_changePatch
 039a: 7c 93       CALF    $0C93
 039c: 55 a8 10    OFFIW   $FFA8_midiSwitch,$10 (MIDI Func2)
 039f: 79 29       CALF    $0929
@@ -514,7 +514,7 @@ set up testmode
 03c0: 01 ba       LDAW    $FFBA_bank
 03c2: 60 9b       ORA     A,C
 03c4: 7d 45       CALF    $0D45_digitLookup
-03c6: 7c d0       CALF    $0CD0
+03c6: 7c d0       CALF    $0cd0_changePatch
 03c8: 7c 93       CALF    $0C93
 03ca: 55 a8 10    OFFIW   $FFA8_midiSwitch,$10 (MIDI Func2)
 03cd: 79 29       CALF    $0929
@@ -544,7 +544,7 @@ set up testmode
 03fa: 74 98 bb    ORAW    $FFBB_patch
 03fd: 7d 45       CALF    $0D45_digitLookup
 03ff: 7c 3c       CALF    $0C3C
-0401: 7c d0       CALF    $0CD0
+0401: 7c d0       CALF    $0cd0_changePatch
 0403: 7c 93       CALF    $0C93
 0405: 55 a3 80    OFFIW   $FFA3_patchVal,$80
 0408: 4f ce       JRE     $03D8
@@ -631,7 +631,7 @@ set up testmode
 04a8: 48 3a       NEGA    
 04aa: 19          MOV     EAL,A
 04ab: 37 02       LTI     A,$02
-04ad: 78 7e       CALF    $087E
+04ad: 78 7e       CALF    $087E_sendValue
 04af: 22          INX     DE
 04b0: 32          INX     HL
 04b1: 42          INR     B
@@ -719,20 +719,20 @@ set up testmode
 0548: 54 11 01    JMP     $0111
 054b: 10          EXA     
 054c: 11          EXX     
-054d: 64 c8 08    ONI     ANM,$08
+054d: 64 c8 08    ONI     ANM,$08           // which "bank" of ADCs?
 0550: d1          JR      $0562
 0551: 34 68 ff    LXI     HL,$FF68
-0554: 78 71       CALF    $0871
+0554: 78 71       CALF    $0871_readADCs
 0556: 01 c5       LDAW    $FFC5_leftDigit
 0558: 4d c1       MOV     PB,A
 055a: 64 05 00    MVI     PF,$00
 055d: 64 80 00    MVI     ANM,$00
 0560: 4e 2b       JRE     $058D
-0562: 6e ff       MVI     H,$FF
+0562: 6e ff       MVI     H,$FF             // other bank
 0564: 01 cc       LDAW    $FFCC
 0566: 46 58       ADI     A,$58
 0568: 1f          MOV     L,A
-0569: 78 71       CALF    $0871
+0569: 78 71       CALF    $0871_readADCs
 056b: 01 cc       LDAW    $FFCC
 056d: 46 04       ADI     A,$04
 056f: 48 0b       SK      HC
@@ -1197,7 +1197,8 @@ send Zero DAC command to module board
 086e: 79 e8       CALF    $09E8_sendToTx
 0870: b8          RET
 
-read ADCs
+// read ADCs
+0871_readADCs:
 0871: 4c e0       MOV     A,CR0
 0873: 3d          STAX    (HL+)
 0874: 4c e1       MOV     A,CR1
@@ -1210,6 +1211,7 @@ read ADCs
 
 called with a value in C
 save edited value, send to module, and optionally send to sysex
+$087e_sendValue
 087e: 78 c3       CALF    $08C3
 0880: 59 b6       BIT     1,$FFB6                // might be "patch changed" flag or something
 0882: 4e 23       JRE     $08A7
@@ -1930,10 +1932,12 @@ manual mode middle bars
 0c4a: 71 c5 04    MVIW    $FFC5_leftDigit,$04
 0c4d: 71 c6 04    MVIW    $FFC6_rightDigit,$04
 0c50: 01 c7       LDAW    $FFC7
+
+// test a value, might be Manual mode
 0c52: 59 b6       BIT     1,$FFB6
 
-switches? falls through from previous
-0c54: 01 b8       LDAW    $FFB8
+// called from startup routine
+0c54: 01 b8       LDAW    $FFB8             // latched switches1 value?
 0c56: 63 8e       STAW    $FF8E_switches1
 0c58: 7b f9       CALF    $0BF9
 0c5a: 01 a7       LDAW    $FFA7
@@ -1989,6 +1993,7 @@ shift bits in a and count?
 0ca6: b8          RET
 
 calculate address for patch data
+$0CA7_calcPatchAddr
 0ca7: 58 b6       BIT     0,$FFB6 // test mode?    // are we in test mode
 0ca9: c8          JR      $0CB2      // no, skip ahead
 0caa: 6e 0f       MVI     H,$0F      // address is $0f00
@@ -2016,6 +2021,7 @@ calculate address for patch data
 
 change patch
 called with patch value in C
+$0cd0_changePatch
 0cd0: 69 fd       MVI     A,$FD              // select module board // select module board
 0cd2: 79 e8       CALF    $09E8_sendToTx
 0cd4: 69 90       MVI     A,$90              // start with LFO rate, first slider
@@ -2066,7 +2072,7 @@ something to do with patches, possibly packing?
 0d1b: 7c 3c       CALF    $0C3C
 0d1d: 01 b9       LDAW    $FFB9
 0d1f: 1b          MOV     C,A
-0d20: 7c d0       CALF    $0CD0
+0d20: 7c d0       CALF    $0cd0_changePatch
 0d22: 7c 93       CALF    $0C93
 0d24: b8          RET
 

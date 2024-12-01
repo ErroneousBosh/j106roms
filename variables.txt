@@ -1,0 +1,27 @@
+$FF30-$FF3D - bitfield for all notes from either source
+$FF3E       - MIDI Parameter
+$FF3F       - MIDI expected byte count
+$FF40       - bitfield for notes from MIDI
+$FF4E       - current MIDI status byte
+$FF4F       - Sysex message type?
+$FF50-$FF57 - bitfield for notes from keyboard
+$FF58
+
+$FF68
+$FF6A
+$FF6B
+$FF6C
+
+$FF7F
+
+$FF80 - $FF85 - voice table
+$FF86         - note table pointer?
+$FF87         - "All Notes Off" flags
+$FF88 - $FF8D - note table
+$FF8E         - switches1 as sent to module
+$FF8F         - switches2 as sent to module
+$FF90         - current patch RAM
+$FFA0         - something to do with pitch bend
+$FFA1         - something to do with pitch bend
+$FFA2         - modwheel amount
+$FFA3         - current patch number
