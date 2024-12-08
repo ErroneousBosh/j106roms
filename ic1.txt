@@ -2432,99 +2432,22 @@ unknown4
 0f7d: 00          NOP     
 0f7e: 00          NOP     
 0f7f: 00          NOP     
-0f80: 40 80 00    CALL    $0080
-0f83: 00          NOP     
-0f84: 00          NOP     
-0f85: ff          JR      $0F85
-0f86: 00          NOP     
-0f87: 00          NOP     
-0f88: 00          NOP     
-0f89: 7f 40       CALF    $0F40
-0f8b: 00          NOP     
-0f8c: 80          CALT    ($0080)
-0f8d: 00          NOP     
-0f8e: 00          NOP     
-0f8f: 00          NOP     
-0f90: 40 80 00    CALL    $0080
-0f93: 00          NOP     
-0f94: 00          NOP     
-0f95: ff          JR      $0F95
-0f96: 00          NOP     
-0f97: 00          NOP     
-0f98: 00          NOP     
-0f99: 7f 40       CALF    $0F40
-0f9b: 00          NOP     
-0f9c: 80          CALT    ($0080)
-0f9d: 7f 00       CALF    $0F00
-0f9f: 7f 40       CALF    $0F40
-0fa1: 80          CALT    ($0080)
-0fa2: 00          NOP     
-0fa3: 00          NOP     
-0fa4: 00          NOP     
-0fa5: b1          PUSH    BC
-0fa6: 7f 00       CALF    $0F00
-0fa8: 00          NOP     
-0fa9: 7f 40       CALF    $0F40
-0fab: 00          NOP     
-0fac: 80          CALT    ($0080)
-0fad: 7f 00       CALF    $0F00
-0faf: 00          NOP     
-0fb0: 40 80 00    CALL    $0080
-0fb3: 00          NOP     
-0fb4: 80          CALT    ($0080)
-0fb5: ff          JR      $0FB5
-0fb6: 00          NOP     
-0fb7: 00          NOP     
-0fb8: 00          NOP     
-0fb9: 7f 40       CALF    $0F40
-0fbb: 00          NOP     
-0fbc: 80          CALT    ($0080)
-0fbd: 7f 00       CALF    $0F00
-0fbf: 00          NOP     
-0fc0: 40 80 00    CALL    $0080
-0fc3: 80          CALT    ($0080)
-0fc4: 00          NOP     
-0fc5: ff          JR      $0FC5
-0fc6: 00          NOP     
-0fc7: 00          NOP     
-0fc8: 80          CALT    ($0080)
-0fc9: 7f 40       CALF    $0F40
-0fcb: 00          NOP     
-0fcc: 80          CALT    ($0080)
-0fcd: 7f 00       CALF    $0F00
-0fcf: 00          NOP     
-0fd0: 40 80 00    CALL    $0080
-0fd3: 00          NOP     
-0fd4: 7f ff       CALF    $0FFF
-0fd6: 00          NOP     
-0fd7: 00          NOP     
-0fd8: 00          NOP     
-0fd9: 7f 40       CALF    $0F40
-0fdb: 00          NOP     
-0fdc: 80          CALT    ($0080)
-0fdd: 7f 00       CALF    $0F00
-0fdf: 00          NOP     
-0fe0: 40 80 00    CALL    $0080
-0fe3: 00          NOP     
-0fe4: 00          NOP     
-0fe5: ff          JR      $0FE5
-0fe6: 7f 00       CALF    $0F00
-0fe8: 00          NOP     
-0fe9: 7f 40       CALF    $0F40
-0feb: 00          NOP     
-0fec: 80          CALT    ($0080)
-0fed: 7f 00       CALF    $0F00
-0fef: 00          NOP     
-0ff0: 40 80 00    CALL    $0080
-0ff3: 80          CALT    ($0080)
-0ff4: 00          NOP     
-0ff5: ff          JR      $0FF5
-0ff6: 00          NOP     
-0ff7: 00          NOP     
-0ff8: 00          NOP     
-0ff9: 7f 40       CALF    $0F40
-0ffb: 00          NOP     
-0ffc: 8a          CALT    ($0094)
-0ffd: 00          NOP     
-0ffe: 0a          MOV     A,B
-0fff: 00          NOP     
+
+
+// test mode patches
+// 1 - VCA offset
+0f80: 40 80 00 00 00 ff 00 00 00 7f 40 00 80 00 00 00
+// 2 - Sub osc level
+0f90: 40 80 00 00 00 ff 00 00 00 7f 40 00 80 7f 00 7f
+// 3 - VCA Gain / VCF Tune
+0fa0: 40 80 00 00 00 b1 7f 00 00 7f 40 00 80 7f 00 00
+// 4 - Saw
+0fb0: 40 80 00 00 80 ff 00 00 00 7f 40 00 80 7f 00 00
+// 5 - PWM 50%
+0fc0: 40 80 00 80 00 ff 00 00 80 7f 40 00 80 7f 00 00
+// 6 - Noise Level
+0fd0: 40 80 00 00 7f ff 00 00 00 7f 40 00 80 7f 00 00
+// 7 - VCF High/Low
+0fe0: 40 80 00 00 00 ff 7f 00 00 7f 40 00 80 7f 00 00
+// 8 - Retrigger
+0ff0: 40 80 00 80 00 ff 00 00 00 7f 40 00 8a 00 0a 00
