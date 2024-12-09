@@ -64,5 +64,8 @@ $FFB3         - PWM/Env/EG/HPF slide switches
 $FFB4         - Key Trans/Poly/MIDI/modeswitch/group button
 $FFB5         - patch pedal/manual/write/tape buttons
 $FFB6         - flags, bit 0 test mode, 1 ? 2 ? 3 Sustain on? 4 Sustain Off? 5? 6? 7?
-
+$FFC5         - Bank 7-seg LEDs
+$FFC6         - Patch 7-seg LEDs
+$FFC7         - range/waveform/chorus LEDs
+$FFC8         - Key / Poly mode / Tape / Group LEDs
 $FFCC         - Panel ADC offset

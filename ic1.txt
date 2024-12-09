@@ -737,29 +737,29 @@ set up testmode
 0560: 4e 2b       JRE     $058D
 0562: 6e ff       MVI     H,$FF             // read panel sliders
 0564: 01 cc       LDAW    $FFCC             // offset for where to store panel values
-0566: 46 58       ADI     A,$58             // +
+0566: 46 58       ADI     A,$58             // pot values saved at $FF58 on
 0568: 1f          MOV     L,A
-0569: 78 71       CALF    $0871_readADCs
-056b: 01 cc       LDAW    $FFCC
-056d: 46 04       ADI     A,$04
-056f: 48 0b       SK      HC
-0571: cc          JR      $057E
-0572: 71 cc 00    MVIW    $FFCC,$00
-0575: 20 cd       INRW    $FFCD
-0577: 00          NOP     
-0578: 64 80 08    MVI     ANM,$08
-057b: 69 fc       MVI     A,$FC
-057d: d1          JR      $058F
-057e: 63 cc       STAW    $FFCC
-0580: 48 01       SLRC    A
+0569: 78 71       CALF    $0871_readADCs    // read CR0-3 into $FF58, $FF5C, $FF60, $FF64
+056b: 01 cc       LDAW    $FFCC             // fetch the offset back
+056d: 46 04       ADI     A,$04             // next four values
+056f: 48 0b       SK      HC                // if it's rolled over 16 values...
+0571: cc          JR      $057E             // it hasn't
+0572: 71 cc 00    MVIW    $FFCC,$00         // ... go back to the first set
+0575: 20 cd       INRW    $FFCD             // increment other counter
+0577: 00          NOP                       // (ignore skip)
+0578: 64 80 08    MVI     ANM,$08           // select inputs 4-7 for pitchbend etc
+057b: 69 fc       MVI     A,$FC             // interrupt counter value
+057d: d1          JR      $058F             // exit interrupt, setting the countdown timer
+057e: 63 cc       STAW    $FFCC             // haven't rolled over yet, store the updated offset
+0580: 48 01       SLRC    A                 // divide by four
 0582: 48 01       SLRC    A
-0584: 46 c5       ADI     A,$C5
-0586: 1f          MOV     L,A
-0587: 2b          LDAX    (HL)
-0588: 4d c1       MOV     PB,A
-058a: 64 45 40    ADI     PF,$40
-058d: 69 f7       MVI     A,$F7              // reset interrupt counter
-058f: 63 cb       STAW    $FFCB_timerCounter_timerCounter
+0584: 46 c5       ADI     A,$C5             
+0586: 1f          MOV     L,A               // now points to $FFC5, $FFC6, $FFC7, $FFC8
+0587: 2b          LDAX    (HL)              // fetch LED pattern from RAM
+0588: 4d c1       MOV     PB,A              // into port A
+058a: 64 45 40    ADI     PF,$40            // select appropriate column
+058d: 69 f7       MVI     A,$F7             // reset interrupt counter
+058f: 63 cb       STAW    $FFCB_timerCounter
 0591: 10          EXA     
 0592: 11          EXX     
 0593: aa          EI      
