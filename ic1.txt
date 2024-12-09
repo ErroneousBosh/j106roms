@@ -34,9 +34,9 @@ serial handler
 002e: 00          NOP     
 002f: 00          NOP     
 
-// table of values referenced at 0x088c
-// likely to be something to do with
-// patch data addresses
+// table to "unscramble" pot readings to sysex values
+// Env Decay is first pot reading but sysex message $0c, and so on
+// converts pot value address to patchram address
 0030: 9c 97 94 90 9d 9a 95 93
 0038: 9e 98 96 91 9b 99 9f 92
 
@@ -612,7 +612,7 @@ set up testmode
 047d: 07 7f       ANI     A,$7F
 047f: 1b          MOV     C,A
 0480: 6d a0       MVI     E,$A0
-0482: 78 d6       CALF    $08D6
+0482: 78 d6       CALF    $08D6_send1Sysex
 0484: 25 ad 00    GTIW    $FFAD,$00
 0487: d5          JR      $049D
 0488: 01 a7       LDAW    $FFA7
@@ -625,7 +625,7 @@ set up testmode
 0496: 07 1f       ANI     A,$1F
 0498: 1b          MOV     C,A
 0499: 6d a1       MVI     E,$A1
-049b: 78 d6       CALF    $08D6
+049b: 78 d6       CALF    $08D6_send1Sysex
 049d: 6a 00       MVI     B,$00
 049f: 24 58 ff    LXI     DE,$FF58
 04a2: 34 6c ff    LXI     HL,$FF6C
@@ -1239,7 +1239,7 @@ $087e_sendValue
 089a: 0b          MOV     A,C                    // value in C
 089b: 79 e8       CALF    $09E8_sendToTx
 089d: 45 a8 30    ONIW    $FFA8_midiSwitch,$30 (MIDI Func1+2)
-08a0: 78 d6       CALF    $08D6                  // if sysex is enabled send one value
+08a0: 78 d6       CALF    $08D6_send1Sysex                  // if sysex is enabled send one value
 08a2: a2          POP     DE                     // restore
 08a3: a3          POP     HL
 08a4: 2a          LDAX    (DE)                   // whatever HL and DE had here
@@ -1281,7 +1281,8 @@ $087e_sendValue
 08d4: 1b          MOV     C,A
 08d5: b8          RET
 
-send single value sysex
+// send single value sysex
+08d6_send1Sysex
 08d6: 6c 32       MVI     D,$32
 08d8: 79 15       CALF    $0915_sendSysexHeader
 08da: 0d          MOV     A,E
@@ -1953,8 +1954,8 @@ manual mode middle bars
 0c5c: 63 8f       STAW    $FF8F_switches2
 0c5e: 7c 29       CALF    $0C29_sw2ToModule
 0c60: 6a 00       MVI     B,$00
-0c62: 24 58 ff    LXI     DE,$FF58
-0c65: 34 6c ff    LXI     HL,$FF6C
+0c62: 24 58 ff    LXI     DE,$FF58          // patch slider values
+0c65: 34 6c ff    LXI     HL,$FF6C          // hysteresis value?
 0c68: 78 c3       CALF    $08C3
 0c6a: b3          PUSH    HL
 0c6b: b2          PUSH    DE
@@ -2097,14 +2098,14 @@ encode switches byte into upper bits?
 0d31: f5          JR      $0D27
 0d32: b8          RET
 
-save digit pattern
+// save digit pattern
 0d33: 01 c5       LDAW    $FFC5_leftDigit
 0d35: 63 c9       STAW    $FFC9
 0d37: 01 c6       LDAW    $FFC6_rightDigit
 0d39: 63 ca       STAW    $FFCA
 0d3b: b8          RET     
 
-restore digit pattern
+// restore digit pattern
 0d3c: 01 c9       LDAW    $FFC9
 0d3e: 63 c5       STAW    $FFC5_leftDigit
 0d40: 01 ca       LDAW    $FFCA

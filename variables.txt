@@ -23,10 +23,11 @@ $FF65       - VCF Key Track pot
 $FF66       - Sub Osc pot
 $FF67       - DCO LFO pot
 $FF68       - Bender CV
-$FF6A       - LFO Sensitivity
-$FF6B       - Bender polarity
-$FF6C       - LFO Trigger
+$FF69       - LFO Sensitivity
+$FF6A       - Bender polarity
+$FF6B       - LFO Trigger
 
+$FF6C       - something to do with pot hysteresis
 
 
 $FF7F
@@ -68,4 +69,7 @@ $FFC5         - Bank 7-seg LEDs
 $FFC6         - Patch 7-seg LEDs
 $FFC7         - range/waveform/chorus LEDs
 $FFC8         - Key / Poly mode / Tape / Group LEDs
+$FFC9         - used to store bank value while setting MIDI or Transpose
+$FFCA         - used to store patch value while setting MIDI or Transpose
+$FFCB         - counter for triggering ADC and LED routine from timer interrupt
 $FFCC         - Panel ADC offset
