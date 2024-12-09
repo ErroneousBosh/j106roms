@@ -1,3 +1,4 @@
+// IC1 variables
 $FF30-$FF3D - bitfield for all notes from either source
 $FF3E       - MIDI Parameter
 $FF3F       - MIDI expected byte count
@@ -5,18 +6,34 @@ $FF40       - bitfield for notes from MIDI
 $FF4E       - current MIDI status byte
 $FF4F       - Sysex message type?
 $FF50-$FF57 - bitfield for notes from keyboard
-$FF58
+$FF58       - Decay pot
+$FF59       - VCF Env pot
+$FF5A       - Noise pot
+$FF5B       - LFO Rate pot
+$FF5C       - Sustain pot
+$FF5D       - VCA Level pot
+$FF5E       - Cutoff Freq pot
+$FF5F       - PWM pot
+$FF60       - Release pot
+$FF61       - VCF LFO pot
+$FF62       - Resonance pot
+$FF63       - LFO Delay pot
+$FF64       - Attack pot
+$FF65       - VCF Key Track pot
+$FF66       - Sub Osc pot
+$FF67       - DCO LFO pot
+$FF68       - Bender CV
+$FF6A       - LFO Sensitivity
+$FF6B       - Bender polarity
+$FF6C       - LFO Trigger
 
-$FF68
-$FF6A
-$FF6B
-$FF6C
+
 
 $FF7F
 
 $FF80 - $FF85 - voice table
 $FF86         - note table pointer?
-$FF87         - "All Notes Off" flags
+$FF87         - "All Notes Off" flags bit 7 marks the need for All Notes Off, bit 6 marks it as sent
 $FF88 - $FF8D - note table
 $FF8E         - switches1 as sent to module
 $FF8F         - switches2 as sent to module
@@ -25,3 +42,27 @@ $FFA0         - something to do with pitch bend
 $FFA1         - something to do with pitch bend
 $FFA2         - modwheel amount
 $FFA3         - current patch number
+// Raw switch bits
+$FFA4         - bank buttons
+$FFA5         - patch buttons
+$FFA6         - Range / Waveform / Chorus buttons
+$FFA7         - PWM/Env/EG/HPF slide switches
+$FFA8         - Key Trans/Poly/MIDI/modeswitch/group button
+$FFA9         - patch pedal/manual/write/tape buttons
+// XORed with previous reading
+$FFAA         - bank buttons
+$FFAB         - patch buttons
+$FFAC         - Range / Waveform / Chorus buttons
+$FFAD         - PWM/Env/EG/HPF slide switches
+$FFAE         - Key Trans/Poly/MIDI/modeswitch/group button
+$FFAF         - patch pedal/manual/write/tape buttons
+// ANDed with previous readings
+$FFB0         - bank buttons
+$FFB1         - patch buttons
+$FFB2         - Range / Waveform / Chorus buttons
+$FFB3         - PWM/Env/EG/HPF slide switches
+$FFB4         - Key Trans/Poly/MIDI/modeswitch/group button
+$FFB5         - patch pedal/manual/write/tape buttons
+$FFB6         - flags, bit 0 test mode, 1 ? 2 ? 3 Sustain on? 4 Sustain Off? 5? 6? 7?
+
+$FFCC         - Panel ADC offset

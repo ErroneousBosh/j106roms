@@ -15,9 +15,11 @@ NMI handler
 ; bit patterns used for Note Off
 0010: fe fd fb f7 ef df bf 7f
 
+// Timer/Counter INTE0/1 ISR
+// just NOPs
 0018: 00 00 00 00 00 00 00 00    
 
-timer handler
+// timer handler ADC handler
 0020: 20 cb       INRW    $FFCB_timerCounter
 0022: c3          JR      $0026
 0023: 54 4b 05    JMP     $054B
@@ -45,13 +47,13 @@ serial handler
 
 // LED bitfield table for symbols
 // <top bar> 1 2 3 4 5 6 7
-8 9 0 c E P r <space>
+// 8 9 0 c E P r <space>
 0050: 01 60 c7 e5 6c ad af e8
 0058: ef ed eb 07 8f ce 07 00
 
 // LED bitfield table for transpose values
 // 25 in total
-C C. d d. E F F. G G. A A. B
+// C C. d d. E F F. G G. A A. B
 0060: 8b 9b 67 77 8f 8e 9e ab
 0068: bb ee fe 2f 8b 9b 67 77
 0070: 8f 8e 9e ab bb ee fe 2f 8b
@@ -60,7 +62,7 @@ start of code proper
 0079: 69 00       MVI     A,$00
 007b: 4d c1       MOV     PB,A
 007d: 4d c5       MOV     PF,A
-007f: 63 cc       STAW    $FFCC  // something to do with ADC
+007f: 63 cc       STAW    $FFCC  // offset for panel ADC values
 0081: 63 cd       STAW    $FFCD  // something to do with ADC
 0083: 63 c0       STAW    $FFC0_runningStatus
 0085: 63 b7       STAW    $FFB7  // set to zero for Manual
@@ -143,16 +145,16 @@ start of code proper
 0125: 78 00       CALF    $0800_showTranspose
 0127: 24 ff 1f    LXI     DE,$1FFF       // select MUX
 012a: 34 50 ff    LXI     HL,$FF50       // keypad bitfield
-012d: 6a e8       MVI     B,$E8          // first column
+012d: 6a e8       MVI     B,$E8          // IC8 enabled, select column 0
 012f: 0a          MOV     A,B
-0130: 3a          STAX    (DE)           // enable
+0130: 3a          STAX    (DE)           // write to IC8
 0131: 00          NOP     
 0132: 00          NOP     
 0133: 4c c0       MOV     A,PA           // read keyboard
 0135: 3b          STAX    (HL)           // save in bitfield
 0136: 0a          MOV     A,B
 0137: 17 10       ORI     A,$10
-0139: 3a          STAX    (DE)           // disable column
+0139: 3a          STAX    (DE)           // disable IC8
 013a: 32          INX     HL             // next bitfield byte
 013b: 42          INR     B              // next column
 013c: 48 0b       SK      HC             // rolled over first nybble?
@@ -197,8 +199,8 @@ start of code proper
 done with transpose?
 -------------------------------------------------------------
 017d: 24 ff 1f    LXI     DE,$1FFF       // select keypad MUX
-0180: 69 de       MVI     A,$DE
-0182: 3a          STAX    (DE)           // column 6
+0180: 69 de       MVI     A,$DE          // enable IC9, select column 6
+0182: 3a          STAX    (DE)           // write to IC9
 0183: 00          NOP     
 0184: 00          NOP     
 0185: 4c c0       MOV     A,PA           // read it
@@ -219,7 +221,8 @@ this populates the key scan table
 and also decides if we need to emit some MIDI
 019e: 24 ff 1f    LXI     DE,$1FFF       // keypad MUX
 01a1: 34 50 ff    LXI     HL,$FF50       // key bitfield
-01a4: 6a e8       MVI     B,$E8          // first column
+01a4: 6a e8       MVI     B,$E8          // IC8, column 0
+// key scan loop
 01a6: 0a          MOV     A,B            
 01a7: 3a          STAX    (DE)           // enable
 01a8: 00          NOP     
@@ -230,7 +233,7 @@ and also decides if we need to emit some MIDI
 01af: 15 87 80    ORIW    $FF87,$80      // yes, set All Notes Off flag
 01b2: 0a          MOV     A,B
 01b3: 17 10       ORI     A,$10          
-01b5: 3a          STAX    (DE)           // disable
+01b5: 3a          STAX    (DE)           // disable IC8 output
 01b6: 0b          MOV     A,C            // get bitfield back
 01b7: 70 93       XRAX    (HL)           // compare with bitfield already stored
 01b9: 48 0c       SK      Z              // has it changed
@@ -239,7 +242,7 @@ and also decides if we need to emit some MIDI
 01be: 3d          STAX    (HL+)          // save, incrementing HL, in the bitfield RAM
 01bf: 42          INR     B              // next column
 01c0: 48 0b       SK      HC             // if we rolled over a nybble skip
-01c2: e3          JR      $01A6          // go back for the next column
+01c2: e3          JR      $01A6          // otherwise go back for the next column
 01c3: 55 87 80    OFFIW   $FF87,$80      // there are keys held
 01c6: d3          JR      $01DA          // jump ahead
 01c7: 5e 87       BIT     6,$FF87        // we already sent All Notes Off
@@ -283,7 +286,7 @@ now consider the keypad buttons
 -------------------------------------------------------
 0208: 24 ff 1f    LXI     DE,$1FFF       // keypad mux       
 020b: 34 a4 ff    LXI     HL,$FFA4       // raw switch data
-020e: 6a da       MVI     B,$DA          // mux column, start with bank buttons
+020e: 6a da       MVI     B,$DA          // IC9 enabled, column 2 (bank buttons)
 0210: 0a          MOV     A,B
 0211: 3a          STAX    (DE)           // enable
 0212: 00          NOP                    // wait
@@ -291,7 +294,7 @@ now consider the keypad buttons
 0214: 4c c0       MOV     A,PA           // read
 0216: 1b          MOV     C,A            // save
 0217: 0a          MOV     A,B
-0218: 17 20       ORI     A,$20          // disable
+0218: 17 20       ORI     A,$20          // disable IC9 outputs
 021a: 3a          STAX    (DE)
 021b: 0b          MOV     A,C            // get it back
 021c: 70 93       XRAX    (HL)           // has it changed?
@@ -370,11 +373,11 @@ set up testmode
 029e: 54 62 0d    JMP     $0D62
 02a1: 59 b5       BIT     1,$FFB5
 02a3: c4          JR      $02A8
-02a4: 5c a9       BIT     4,$FFA9
+02a4: 5c a9       BIT     4,$FFA9               // service manual suggests "VERIFY" button?
 02a6: 7c 47       CALF    $0C47_showManual
 02a8: 5a af       BIT     2,$FFAF
 02aa: 4e 20       JRE     $02CC
-02ac: 5a a9       BIT     2,$FFA9
+02ac: 5a a9       BIT     2,$FFA9               // service manual suggests Write button
 02ae: d0          JR      $02BF
 02af: 7d 33       CALF    $0D33_saveDigitPatt
 02b1: 05 b6 fb    ANIW    $FFB6,$FB              // omni on/off?
@@ -595,14 +598,14 @@ set up testmode
 045d: 25 b2 00    GTIW    $FFB2,$00
 0460: 4e 22       JRE     $0484
 0462: 59 b6       BIT     1,$FFB6
-0464: 7d 5b       CALF    $0D5B
+0464: 7d 5b       CALF    $0D5B_dpOn
 0466: 55 b2 07    OFFIW   $FFB2,$07
 0469: 7b cc       CALF    $0BCC
 046b: 55 b2 18    OFFIW   $FFB2,$18
 046e: 7b da       CALF    $0BDA
 0470: 55 b2 e0    OFFIW   $FFB2,$E0
 0473: 7b eb       CALF    $0BEB
-0475: 7b f9       CALF    $0BF9
+0475: 7b f9       CALF    $0BF9_sw1ToModule
 0477: 55 a8 30    OFFIW   $FFA8_midiSwitch,$30 (MIDI Func1+2)
 047a: c9          JR      $0484
 047b: 01 c7       LDAW    $FFC7
@@ -615,7 +618,7 @@ set up testmode
 0488: 01 a7       LDAW    $FFA7
 048a: 59 b6       BIT     1,$FFB6
 048c: 7c 0c       CALF    $0C0C
-048e: 7c 29       CALF    $0C29
+048e: 7c 29       CALF    $0C29_sw2ToModule
 0490: 55 a8 30    OFFIW   $FFA8_midiSwitch,$30 (MIDI Func1+2)
 0493: c9          JR      $049D
 0494: 01 8f       LDAW    $FF8F_switches2
@@ -655,7 +658,7 @@ set up testmode
 04d2: 54 11 01    JMP     $0111
 04d5: 25 ce 00    GTIW    $FFCE,$00
 04d8: d7          JR      $04F0
-04d9: 7d 5b       CALF    $0D5B
+04d9: 7d 5b       CALF    $0D5B_dpOn
 04db: 24 90 ff    LXI     DE,$FF90_patchRam
 04de: 6a 07       MVI     B,$07
 04e0: 01 ce       LDAW    $FFCE
@@ -670,7 +673,7 @@ set up testmode
 04ed: 71 ce 00    MVIW    $FFCE,$00
 04f0: 25 cf 00    GTIW    $FFCF,$00
 04f3: d7          JR      $050B
-04f4: 7d 5b       CALF    $0D5B
+04f4: 7d 5b       CALF    $0D5B_dpOn
 04f6: 24 98 ff    LXI     DE,$FF98
 04f9: 6a 07       MVI     B,$07
 04fb: 01 cf       LDAW    $FFCF
@@ -686,20 +689,20 @@ set up testmode
 050b: 5d b6       BIT     5,$FFB6
 050d: d0          JR      $051E
 050e: 05 b6 df    ANIW    $FFB6,$DF
-0511: 7d 5b       CALF    $0D5B
+0511: 7d 5b       CALF    $0D5B_dpOn
 0513: 01 8e       LDAW    $FF8E_switches1
 0515: 57 60       OFFI    A,$60
 0517: c4          JR      $051C
 0518: 17 80       ORI     A,$80
 051a: 63 8e       STAW    $FF8E_switches1
-051c: 7b f9       CALF    $0BF9
+051c: 7b f9       CALF    $0BF9_sw1ToModule
 051e: 5e b6       BIT     6,$FFB6
 0520: cc          JR      $052D
 0521: 05 b6 bf    ANIW    $FFB6,$BF
-0524: 7d 5b       CALF    $0D5B
+0524: 7d 5b       CALF    $0D5B_dpOn
 0526: 71 b7 00    MVIW    $FFB7,$00
 0529: 01 8f       LDAW    $FF8F_switches2
-052b: 7c 29       CALF    $0C29
+052b: 7c 29       CALF    $0C29_sw2ToModule
 052d: 58 b6       BIT     0,$FFB6 // test mode?
 052f: 54 11 01    JMP     $0111
 0532: 6a 05       MVI     B,$05
@@ -717,20 +720,24 @@ set up testmode
 0545: ac          LDAX    (HL+A)
 0546: 63 c6       STAW    $FFC6_rightDigit
 0548: 54 11 01    JMP     $0111
+
+// -----------------------------------------------------
+// ADC Handler
+// -----------------------------------------------------
 054b: 10          EXA     
 054c: 11          EXX     
-054d: 64 c8 08    ONI     ANM,$08           // which "bank" of ADCs?
-0550: d1          JR      $0562
-0551: 34 68 ff    LXI     HL,$FF68
-0554: 78 71       CALF    $0871_readADCs
-0556: 01 c5       LDAW    $FFC5_leftDigit
+054d: 64 c8 08    ONI     ANM,$08           // If AN2 is set...
+0550: d1          JR      $0562             // it isn't, handle inputs 0-3
+0551: 34 68 ff    LXI     HL,$FF68          // Pitch bender etc
+0554: 78 71       CALF    $0871_readADCs    // read CR0-3, store at HL, increment HL
+0556: 01 c5       LDAW    $FFC5_leftDigit   
 0558: 4d c1       MOV     PB,A
 055a: 64 05 00    MVI     PF,$00
-055d: 64 80 00    MVI     ANM,$00
+055d: 64 80 00    MVI     ANM,$00           // select 
 0560: 4e 2b       JRE     $058D
-0562: 6e ff       MVI     H,$FF             // other bank
-0564: 01 cc       LDAW    $FFCC
-0566: 46 58       ADI     A,$58
+0562: 6e ff       MVI     H,$FF             // read panel sliders
+0564: 01 cc       LDAW    $FFCC             // offset for where to store panel values
+0566: 46 58       ADI     A,$58             // +
 0568: 1f          MOV     L,A
 0569: 78 71       CALF    $0871_readADCs
 056b: 01 cc       LDAW    $FFCC
@@ -751,7 +758,7 @@ set up testmode
 0587: 2b          LDAX    (HL)
 0588: 4d c1       MOV     PB,A
 058a: 64 45 40    ADI     PF,$40
-058d: 69 f7       MVI     A,$F7
+058d: 69 f7       MVI     A,$F7              // reset interrupt counter
 058f: 63 cb       STAW    $FFCB_timerCounter_timerCounter
 0591: 10          EXA     
 0592: 11          EXX     
@@ -1253,13 +1260,14 @@ $087e_sendValue
 08b8: a2          POP     DE                     // restore and return
 08b9: a3          POP     HL
 08ba: b8          RET     
-08bb: 7d 5b       CALF    $0D5B                  // enable decimal points
+08bb: 7d 5b       CALF    $0D5B_dpOn                  // enable decimal points
 08bd: 0b          MOV     A,C                    // set top bit of value
 08be: 17 80       ORI     A,$80
 08c0: 3a          STAX    (DE)                   // save it back
 08c1: 4f d0       JRE     $0893                  // send to module board (which will get the real value from C)
 
-unknown1
+// unknown1
+// maybe something to do with hysteresis
 08c3: 2a          LDAX    (DE)
 08c4: 36 04       SUINB   A,$04
 08c6: 69 00       MVI     A,$00
@@ -1847,7 +1855,7 @@ called with bit 3 in C set for on and cleared for off
 0bc9: 79 e8       CALF    $09E8_sendToTx     // send
 0bcb: b8          RET
 
-range switches
+// range switches
 0bcc: 01 b2       LDAW    $FFB2
 0bce: 07 07       ANI     A,$07
 0bd0: 1a          MOV     B,A
@@ -1857,7 +1865,7 @@ range switches
 0bd7: 63 8e       STAW    $FF8E_switches1
 0bd9: b8          RET
 
-osc switches
+// osc switches
 0bda: 01 b2       LDAW    $FFB2
 0bdc: 74 90 8e    XRAW    $FF8E_switches1
 0bdf: 07 18       ANI     A,$18
@@ -1868,7 +1876,7 @@ osc switches
 0be8: 63 8e       STAW    $FF8E_switches1
 0bea: b8          RET
 
-range and osc switches
+// chorus switches
 0beb: 01 b2       LDAW    $FFB2
 0bed: 07 e0       ANI     A,$E0
 0bef: 1a          MOV     B,A
@@ -1878,7 +1886,7 @@ range and osc switches
 0bf6: 63 8e       STAW    $FF8E_switches1
 0bf8: b8          RET
 
-send switches1 to module board
+// send switches1 to module board
 0bf9: 63 c7       STAW    $FFC7
 0bfb: 16 ff       XRI     A,$FF
 0bfd: 07 7f       ANI     A,$7F
@@ -1892,8 +1900,8 @@ send switches1 to module board
 0c0b: b8          RET
 
 adjust switches2
-0c0c: 7d 5b       CALF    $0D5B
-0c0e: 55 ad 18    OFFIW   $FFAD,$18
+0c0c: 7d 5b       CALF    $0D5B_dpOn
+0c0e: 55 ad 18    OFFIW   $FFAD,$18     // HPF switches
 0c11: 15 ad 18    ORIW    $FFAD,$18
 0c14: 01 b7       LDAW    $FFB7
 0c16: 74 98 ad    ORAW    $FFAD
@@ -1919,12 +1927,13 @@ send switches2 to module board
 0c39: 79 e8       CALF    $09E8_sendToTx
 0c3b: b8          RET
 
-test bits, juggle switches around
-0c3c: 59 b6       BIT     1,$FFB6
-0c3e: c7          JR      $0C46
+// test bits, juggle switches around
+// store switches1 bits in FFB8
+0c3c: 59 b6       BIT     1,$FFB6           // might be to do with manual mode?
+0c3e: c7          JR      $0C46             // return
 0c3f: 01 8e       LDAW    $FF8E_switches1
 0c41: 63 b8       STAW    $FFB8
-0c43: 05 b6 fd    ANIW    $FFB6,$FD
+0c43: 05 b6 fd    ANIW    $FFB6,$FD         // clear bit
 0c46: b8          RET
 
 manual mode middle bars
@@ -1939,10 +1948,10 @@ manual mode middle bars
 // called from startup routine
 0c54: 01 b8       LDAW    $FFB8             // latched switches1 value?
 0c56: 63 8e       STAW    $FF8E_switches1
-0c58: 7b f9       CALF    $0BF9
-0c5a: 01 a7       LDAW    $FFA7
+0c58: 7b f9       CALF    $0BF9_sw1ToModule
+0c5a: 01 a7       LDAW    $FFA7             // switches2 value read from IO port
 0c5c: 63 8f       STAW    $FF8F_switches2
-0c5e: 7c 29       CALF    $0C29
+0c5e: 7c 29       CALF    $0C29_sw2ToModule
 0c60: 6a 00       MVI     B,$00
 0c62: 24 58 ff    LXI     DE,$FF58
 0c65: 34 6c ff    LXI     HL,$FF6C
@@ -1971,7 +1980,7 @@ manual mode middle bars
 0c88: 52          DCR     B
 0c89: fb          JR      $0C85
 0c8a: 45 a8 30    ONIW    $FFA8_midiSwitch,$30 (MIDI Func1+2)
-0c8d: 78 e9       CALF    $08E9
+0c8d: 78 e9       CALF    $08E9         // send sysex for Manual mode
 0c8f: 15 b6 02    ORIW    $FFB6,$02
 0c92: b8          RET
 
@@ -2032,13 +2041,13 @@ $0cd0_changePatch
 0cde: 7c f1       CALF    $0CF1              // send 8 bytes
 0ce0: 0b          MOV     A,C                // get the switches value
 0ce1: 63 8e       STAW    $FF8E_switches1    // save in patchRam
-0ce3: 7b f9       CALF    $0BF9              // send switches1 to module
+0ce3: 7b f9       CALF    $0BF9_sw1ToModule              // send switches1 to module
 0ce5: 69 98       MVI     A,$98              // VCF LFO depth
 0ce7: 79 e8       CALF    $09E8_sendToTx     // start it
 0ce9: 7c f1       CALF    $0CF1              // send the next 8 bytes
 0ceb: 0b          MOV     A,C                // get switches value
 0cec: 63 8f       STAW    $FF8F_switches2    // save in patchRam
-0cee: 7c 29       CALF    $0C29              // send switches2 to module
+0cee: 7c 29       CALF    $0C29_sw2ToModule              // send switches2 to module
 0cf0: b8          RET
 
 transmit patch bytes to module board
