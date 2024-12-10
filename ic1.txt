@@ -19,10 +19,12 @@ NMI handler
 // just NOPs
 0018: 00 00 00 00 00 00 00 00    
 
-// timer handler ADC handler
-0020: 20 cb       INRW    $FFCB_timerCounter
+// ADC handler
+// assuming I've understood the reference manual correctly
+// this gets called every 4x48us or 192us, around 5.2kHz?
+0020: 20 cb       INRW    $FFCB_timerCounter    // set to $F7 or $FC in interrupt routine
 0022: c3          JR      $0026
-0023: 54 4b 05    JMP     $054B
+0023: 54 4b 05    JMP     $054B // call actual handler, at something like 650 or 1300Hz?
 0026: aa          EI      
 0027: 62          RETI  
 
@@ -58,7 +60,7 @@ serial handler
 0068: bb ee fe 2f 8b 9b 67 77
 0070: 8f 8e 9e ab bb ee fe 2f 8b
 
-start of code proper
+// start of code proper
 0079: 69 00       MVI     A,$00
 007b: 4d c1       MOV     PB,A
 007d: 4d c5       MOV     PF,A
@@ -69,12 +71,12 @@ start of code proper
 0087: 64 02 fd    MVI     PC,$FD
 008a: aa          EI      
 008b: 75 cd 08    EQIW    $FFCD,$08
-008e: fc          JR      $008B
-008f: 71 b8 2a    MVIW    $FFB8,$2A
+008e: fc          JR      $008B         // wait for a while, possibly for all pots to be read?
+008f: 71 b8 2a    MVIW    $FFB8,$2A     // 8', square wave on, saw off, chorus off
 0092: 7c 54       CALF    $0C54
-0094: 75 cd 10    EQIW    $FFCD,$10
+0094: 75 cd 10    EQIW    $FFCD,$10     // wait a bit more
 0097: fc          JR      $0094
-0098: 7b 81       CALF    $0b81_clrVoiceTbl
+0098: 7b 81       CALF    $0b81_clrVoiceTbl // set up RAM
 009a: 4e 71       JRE     $010D
 
 // startup
@@ -84,26 +86,26 @@ start of code proper
 00a2: 4d c9       MOV     SMH,A
 00a4: 69 4e       MVI     A,$4E          // 8n1 x16 clock
 00a6: 4d ca       MOV     SML,A      
-00a8: 64 80 08    MVI     ANM,$08        // select DAC 4-7, scan off, HF mode
-00ab: 68 ff       MVI     V,$FF
-00ad: 10          EXA     
+00a8: 64 80 08    MVI     ANM,$08        // select DAC 4-7, scan mode, HF mode - 48us per sample
+00ab: 68 ff       MVI     V,$FF          // vector pointer to RAM (so, for example STAW $FFxx)
+00ad: 10          EXA                    // both register sets
 00ae: 68 ff       MVI     V,$FF          // vector pointer to RAM
 00b0: 04 ff ff    LXI     SP,$FFFF       // stack pointer
 00b3: 69 00       MVI     A,$00          // clear the RAM
 00b5: 34 00 ff    LXI     HL,$FF00
 00b8: 3d          STAX    (HL+)
-00b9: 74 7f 00    EQI     L,$00
-00bc: fb          JR      $00B8
-00bd: 69 03       MVI     A,$03          // port C serial on
+00b9: 74 7f 00    EQI     L,$00          // Check if HL has wrapped
+00bc: fb          JR      $00B8          // if it has this is skipped, if not loop back around
+00bd: 69 03       MVI     A,$03          // port C serial on, all others GPIO
 00bf: 4d d1       MOV     MCC,A
-00c1: 69 3a       MVI     A,$3A          // IO bits
+00c1: 69 3a       MVI     A,$3A          // PC7, PC6, PC2, PC0 output (6+7 tape, 0 MIDI/module out, 2 module select)
 00c3: 4d d4       MOV     MC,A   
 00c5: 69 00       MVI     A,$00          
-00c7: 4d d3       MOV     MB,A           // port B, F set to outputs and turned off
-00c9: 4d d7       MOV     MF,A
-00cb: 4d c5       MOV     PF,A
+00c7: 4d d3       MOV     MB,A           // port B outputs for driving LEDs
+00c9: 4d d7       MOV     MF,A           // port F outputs for address bus, top two bits are LED and AD mux selects
+00cb: 4d c5       MOV     PF,A           // set both to zero
 00cd: 4d c1       MOV     PB,A
-00cf: 69 ff       MVI     A,$FF          // port A set to input
+00cf: 69 ff       MVI     A,$FF          // port A set to input for reading switches
 00d1: 4d d2       MOV     MA,A
 00d3: 71 bc 08    MVIW    $FFBC,$08      // sustain flag?
 00d6: 7b 81       CALF    $0b81_clrVoiceTbl
@@ -562,14 +564,14 @@ set up testmode
 0419: 5b b6       BIT     3,$FFB6
 041b: cb          JR      $0427
 041c: 05 b6 f7    ANIW    $FFB6,$F7
-041f: 69 fd       MVI     A,$FD // select module board // select module board
+041f: 69 fd       MVI     A,$FD // select module board
 0421: 79 e8       CALF    $09E8_sendToTx
 0423: 69 87       MVI     A,$87
 0425: 79 e8       CALF    $09E8_sendToTx
 0427: 5c b6       BIT     4,$FFB6
 0429: cb          JR      $0435
 042a: 05 b6 ef    ANIW    $FFB6,$EF
-042d: 69 fd       MVI     A,$FD // select module board // select module board
+042d: 69 fd       MVI     A,$FD // select module board
 042f: 79 e8       CALF    $09E8_sendToTx
 0431: 69 86       MVI     A,$86
 0433: 79 e8       CALF    $09E8_sendToTx
@@ -1836,7 +1838,7 @@ clear note on bits
 
 Send sustain on/off to module board
 called with bit 3 in C set for on and cleared for off
-0ba9: 69 fd       MVI     A,$FD // select module board // select module board
+0ba9: 69 fd       MVI     A,$FD // select module board
 0bab: 79 e8       CALF    $09E8_sendToTx
 0bad: 0b          MOV     A,C
 0bae: 47 08       ONI     A,$08
@@ -1920,7 +1922,7 @@ send switches2 to module board
 0c2b: 16 ff       XRI     A,$FF
 0c2d: 07 1f       ANI     A,$1F
 0c2f: 1b          MOV     C,A
-0c30: 69 fd       MVI     A,$FD // select module board // select module board
+0c30: 69 fd       MVI     A,$FD // select module board
 0c32: 79 e8       CALF    $09E8_sendToTx
 0c34: 69 8f       MVI     A,$8F
 0c36: 79 e8       CALF    $09E8_sendToTx
@@ -2032,7 +2034,7 @@ $0CA7_calcPatchAddr
 change patch
 called with patch value in C
 $0cd0_changePatch
-0cd0: 69 fd       MVI     A,$FD              // select module board // select module board
+0cd0: 69 fd       MVI     A,$FD              // select module board
 0cd2: 79 e8       CALF    $09E8_sendToTx
 0cd4: 69 90       MVI     A,$90              // start with LFO rate, first slider
 0cd6: 79 e8       CALF    $09E8_sendToTx
