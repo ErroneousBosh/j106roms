@@ -1506,10 +1506,12 @@ in FFC3 where it's XORed to see if a note has changed
 0a15: 63 c3       STAW    $FFC3
 0a17: b8          RET
 
-voice on/off to module board
-when we enter here A contains the "changed" bits
-found by XORing the "calculated" bitfield with
-the "stored" bitfield
+//voice on/off to module board
+//when we enter here A contains the "changed" bits
+//found by XORing the "calculated" bitfield with
+//the "stored" bitfield
+// this takes into account Poly mode and Test mode
+
 0a18: 19          MOV     EAL,A          // save 
 0a19: 0a          MOV     A,B            
 0a1a: 7a 0d       CALF    $0A0D          // construct note from B and C
@@ -1520,10 +1522,10 @@ the "stored" bitfield
 0a21: 1b          MOV     C,A            
 0a22: 34 08 00    LXI     HL,$0008       // lookup table of bits
 0a25: 48 07       SLLC    C              // shift bitfield out
-0a27: 4e 37       JRE     $0A60          // skip this on no carry
+0a27: 4e 37       JRE     $0A60          // no more notes set in this byte, loop around
 0a29: ad          LDAX    (HL+B)         // found a bit, look it up in the list
 0a2a: 74 c8 c3    ONAW    $FFC3          // was it already set?
-0a2d: 4e 23       JRE     $0A52          // Yes
+0a2d: 4e 23       JRE     $0A52          // Yes, so turn it off
 0a2f: 08          MOV     A,EAH          // No, note on
 0a30: 60 9a       ORA     A,B            // combine B with EAH, which holds the upper four bits of note number
 0a32: 59 c8       BIT     1,$FFC8_ledCol3        // Poly 1
@@ -1540,7 +1542,9 @@ Poly 1 Note On handler
 0a3f: 58 b6       BIT     0,$FFB6 // test mode?        // test mode?
 0a41: ca          JR      $0A4C          // no
 
-// test mode 
+-----------------------------------------------------------
+Unison Note On handler
+-----------------------------------------------------------
 0a42: 75 d0 00    EQIW    $FFD0,$00      // try next note if there's already a note held
 0a45: da          JR      $0A60          // do next note
 0a46: 7b 55       CALF    $0B55_noteOnUnison
@@ -1572,16 +1576,16 @@ Main Note Off handler
 0a64: a3          POP     HL
 0a65: b8          RET     
 -----------------------------------------------------------
-test mode "poly1" note off
+Poly1 or Test Unison Note Off
 -----------------------------------------------------------
-0a66: 58 b6       BIT     0,$FFB6 // test mode?
+0a66: 58 b6       BIT     0,$FFB6                // test mode?
 0a68: ca          JR      $0A73                  // no
 0a69: 75 d0 00    EQIW    $FFD0,$00              // no note held
 0a6c: f3          JR      $0A60                  // next note in byte
 0a6d: 7b 70       CALF    $0B70_stopAllNotes 
 0a6f: 71 d0 ff    MVIW    $FFD0,$FF              // this flag
 0a72: ed          JR      $0A60                  // loop back
-0a73: 7a f8       CALF    $0AF8                  // real Poly 1 handler
+0a73: 7a f8       CALF    $0AF8                  // real Poly 1 Note Off handler
 0a75: ea          JR      $0A60
 
 -----------------------------------------------------------
@@ -1755,52 +1759,60 @@ called with note number in L, note to play in C
 0b25: 69 fd       MVI     A,$FD              // select module board
 0b27: 79 e8       CALF    $09E8_sendToTx
 0b29: 0b          MOV     A,C
-0b2a: 79 e8       CALF    $09E8_sendToTx     // send 0x80 to 0x85 to the module board
+0b2a: 79 e8       CALF    $09E8_sendToTx     // send voice off to the module board
 0b2c: a2          POP     DE
 0b2d: a1          POP     BC
 0b2e: a3          POP     HL
 0b2f: b8          RET
 
------------------------------------------------------------
-test mode voice off cyclic thing
------------------------------------------------------------
+//-----------------------------------------------------------
+// test mode voice off cyclic thing
+//-----------------------------------------------------------
+// FIXME better description
+// starts off similar to Poly 1 Note Off
 0b30: b3          PUSH    HL
 0b31: b1          PUSH    BC
 0b32: 1b          MOV     C,A
-0b33: 6a 05       MVI     B,$05
+0b33: 6a 05       MVI     B,$05                // six voices
 0b35: 34 88 ff    LXI     HL,noteTbl
-0b38: 2b          LDAX    (HL)
-0b39: 47 80       ONI     A,$80
-0b3b: c6          JR      $0B42
-0b3c: 32          INX     HL
-0b3d: 52          DCR     B
-0b3e: f9          JR      $0B38
-0b3f: a1          POP     BC
+// loop until we find the note
+0b38: 2b          LDAX    (HL)              // fetch note from table
+0b39: 47 80       ONI     A,$80             // test, skip if it 's off
+0b3b: c6          JR      $0B42             // this note is on
+0b3c: 32          INX     HL                // try the next
+0b3d: 52          DCR     B                 // count down, skip if counter rolls over
+0b3e: f9          JR      $0B38             // loop
+0b3f: a1          POP     BC                // or just return if we don't find it
 0b40: a3          POP     HL
-0b41: b8          RET     
-0b42: 60 eb       NEA     A,C
-0b44: c1          JR      $0B46
-0b45: f6          JR      $0B3C
-0b46: 17 80       ORI     A,$80
-0b48: 3b          STAX    (HL)
-0b49: 69 fd       MVI     A,$FD // select module board
+0b41: b8          RET
+// turn off the voice
+0b42: 60 eb       NEA     A,C               // skip if it is the note we're looking for
+0b44: c1          JR      $0B46             // it is
+0b45: f6          JR      $0B3C             // it is not, loop
+0b46: 17 80       ORI     A,$80             // set the voice off flag
+0b48: 3b          STAX    (HL)              // save it back
+0b49: 69 fd       MVI     A,$FD             // select module board
 0b4b: 79 e8       CALF    $09E8_sendToTx
 0b4d: 0f          MOV     A,L
-0b4e: 66 08       SUI     A,$08
-0b50: 79 e8       CALF    $09E8_sendToTx
+0b4e: 66 08       SUI     A,$08             // subtract 8 to turn the noteTbl pointer into the command
+0b50: 79 e8       CALF    $09E8_sendToTx    // send voice off to the module board
 0b52: a1          POP     BC
 0b53: a3          POP     HL
 0b54: b8          RET
 
-send unison note on to module board
+//-----------------------------------------------------------
+// Unison note on to voice board
+//-----------------------------------------------------------
+// note that this doesn't save the note in noteTbl
+// or touch the voice ordering
 note in A
-0b55: b3          PUSH    HL                 // save
+0b55: b3          PUSH    HL
 0b56: b1          PUSH    BC
 0b57: 74 c0 be    ADDW    $FFBE_transpose
 0b5a: 1b          MOV     C,A
 0b5b: 6a 05       MVI     B,$05              // six voices
-0b5d: 34 88 ff    LXI     HL,noteTbl           // note table
-0b60: 69 fd       MVI     A,$FD // select module board
+0b5d: 34 88 ff    LXI     HL,noteTbl         // note table
+0b60: 69 fd       MVI     A,$FD              // select module board
 0b62: 79 e8       CALF    $09E8_sendToTx
 0b64: 0f          MOV     A,L                // voice on
 0b65: 79 e8       CALF    $09E8_sendToTx
@@ -1813,22 +1825,26 @@ note in A
 0b6e: a3          POP     HL
 0b6f: b8          RET     
 
-stop all notes
+//-----------------------------------------------------------
+// Unison note off to voice board
+//-----------------------------------------------------------
 0b70: b1          PUSH    BC
 0b71: 6b 80       MVI     C,$80          // first "voice off"
 0b73: 6a 05       MVI     B,$05          // six voices
-0b75: 69 fd       MVI     A,$FD // select module board          // send to module board
+0b75: 69 fd       MVI     A,$FD          // select module board
 0b77: 79 e8       CALF    $09E8_sendToTx
 0b79: 0b          MOV     A,C
 0b7a: 79 e8       CALF    $09E8_sendToTx
 0b7c: 43          INR     C
 0b7d: 52          DCR     B
-0b7e: fa          JR      $0B79
+0b7e: fa          JR      $0B79          // loop around all six voices
 0b7f: a1          POP     BC
 0b80: b8          RET 
 
 
-//set up new voice allocation table
+//-----------------------------------------------------------
+// set up new voice allocation table
+//-----------------------------------------------------------
 // the table at $FF80 contains initially values from $88 to $8D
 // these represent two things - the address in the note table for a given voice,
 // and also the command to send to the module board controller IC29 to start
