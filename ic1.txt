@@ -218,9 +218,9 @@ done with transpose?
 0199: 71 c0 00    MVIW    $FFC0_runningStatus,$00    // clear running status
 019c: 63 bf       STAW    $FFBF          // save flag
 
-scan keys again
-this populates the key scan table
-and also decides if we need to emit some MIDI
+// scan keys again
+// this populates the key scan table
+// and also decides if we need to emit some MIDI
 019e: 24 ff 1f    LXI     DE,$1FFF       // keypad MUX
 01a1: 34 50 ff    LXI     HL,$FF50       // key bitfield
 01a4: 6a e8       MVI     B,$E8          // IC8, column 0
@@ -1196,7 +1196,7 @@ send Omni Off Poly
 send Zero DAC command to module board
 085c: 69 fd       MVI     A,$FD // select module board
 085e: 79 e8       CALF    $09E8_sendToTx
-0860: 69 8f       MVI     A,$8F
+0860: 69 8f       MVI     A,$8F         // switches 2
 0862: 79 e8       CALF    $09E8_sendToTx
 0864: 69 5f       MVI     A,$5F
 0866: 79 e8       CALF    $09E8_sendToTx
@@ -1539,6 +1539,8 @@ Poly 1 Note On handler
 -----------------------------------------------------------
 0a3f: 58 b6       BIT     0,$FFB6 // test mode?        // test mode?
 0a41: ca          JR      $0A4C          // no
+
+// test mode 
 0a42: 75 d0 00    EQIW    $FFD0,$00      // try next note if there's already a note held
 0a45: da          JR      $0A60          // do next note
 0a46: 7b 55       CALF    $0B55_noteOnUnison
@@ -1590,7 +1592,7 @@ voice functions
 0a77: b1          PUSH    BC                     // save
 0a78: 1b          MOV     C,A                    // changed bit
 0a79: 6a 05       MVI     B,$05                  // six voices
-0a7b: 34 88 ff    LXI     HL,$FF88_noteTbl               // voice table
+0a7b: 34 88 ff    LXI     HL,noteTbl
 0a7e: 2b          LDAX    (HL)                   // get value
 0a7f: 57 80       OFFI    A,$80                  // top bit clear
 0a81: dc          JR      $0A9E                  // no, send note to module board
@@ -1633,39 +1635,45 @@ called with note number in L, note to play in C
 0aad: a3          POP     HL
 0aae: b8          RET  
 
------------------------------------------------------------
-real Poly 1 note on assigner
------------------------------------------------------------
+//-----------------------------------------------------------
+// real Poly 1 note on assigner
+//-----------------------------------------------------------
+
 0aaf: b3          PUSH    HL
 0ab0: b1          PUSH    BC
 0ab1: b2          PUSH    DE
 0ab2: 1b          MOV     C,A                // save all registers including A
 0ab3: 6a 05       MVI     B,$05              // six voices
 0ab5: 6c ff       MVI     D,$FF              // upper byte of pointer
-0ab7: 34 85 ff    LXI     HL,$FF80_voiceTbl+5
+0ab7: 34 85 ff    LXI     HL,voiceTbl+5
 0aba: 2b          LDAX    (HL)               // get voice
-0abb: 1d          MOV     E,A                // save
-0abc: 2a          LDAX    (DE)               // get value pointed to from note table
+0abb: 1d          MOV     E,A                // form the address of the note-for-voice in DE
+0abc: 2a          LDAX    (DE)               // get note pointed to from note table
 0abd: 57 80       OFFI    A,$80              // bit7?
-0abf: ca          JR      $0ACA              // is set
-0ac0: a2          POP     DE                 // return, is this "all notes used?"
+0abf: ca          JR      $0ACA              // is set, last note is free
+0ac0: a2          POP     DE                 // return if all notes are used, no voice stealing here!
 0ac1: a1          POP     BC
 0ac2: a3          POP     HL
 0ac3: b8          RET     
+// assigner loop
+// run backwards through the voice table looking for the last unused one
+
 0ac4: 2b          LDAX    (HL)               // fetch next voice
 0ac5: 1d          MOV     E,A                // form address
 0ac6: 2a          LDAX    (DE)               // fetch note number
 0ac7: 47 80       ONI     A,$80              // test if top bit is set
 0ac9: c8          JR      $0AD2              // no, jump to tried all voices?
-0aca: 07 7f       ANI     A,$7F              // mask off top bit
-0acc: 60 eb       NEA     A,C                // is this the note we're already playing
-0ace: d1          JR      $0AE0              // not equal, go ahead
+// assigner loop entry point
+0aca: 07 7f       ANI     A,$7F              // mask off top bit of note from table
+0acc: 60 eb       NEA     A,C                // is this the same as the note we want to play?
+0ace: d1          JR      $0AE0              // yes it is, re-enable the voice
 0acf: 33          DCX     HL                 // count down a voice
 0ad0: 52          DCR     B                  // one less to try
-0ad1: f2          JR      $0AC4              // loop back around to slightly before the beginning
-0ad2: 32          INX     HL                 // tried all voices, back up one
+0ad1: f2          JR      $0AC4              // loop back for next voice, if we have any left to do
+// didn't find existng voice in table
+0ad2: 32          INX     HL                 // tried all voices, point to first voice in table
 0ad3: 2b          LDAX    (HL)               // get voice number
-0ad4: 1d          MOV     E,A                // save
+0ad4: 1d          MOV     E,A                // form the address in the note table in DE
 0ad5: 0b          MOV     A,C                // note number in A, voice number in E
 0ad6: ce          JR      $0AE5              // jump ahead to store and send
 0ad7: 33          DCX     HL                 // count down
@@ -1693,45 +1701,58 @@ real Poly 1 note on assigner
 0af6: a3          POP     HL
 0af7: b8          RET
 
------------------------------------------------------------
-Real Poly 1 Note Off assigner
------------------------------------------------------------
+//----------------------------------------------------------
+// Real Poly 1 Note Off assigner
+//----------------------------------------------------------
+//
+// loops around to find the note in noteTbl that matches the Note Off
+// command (or key up event)
+// sets that voice's note number to indicate voice off in noteTbl
+// bubbles the released voice to the end of voiceTbl
+// this means that the most recently freed voice is always pushed to the back
+
+// all registers are clobbered, save
 0af8: b3          PUSH    HL
 0af9: b1          PUSH    BC
 0afa: b2          PUSH    DE
-0afb: 1b          MOV     C,A                // save all
+0afb: 1b          MOV     C,A                // preserve the note value
 0afc: 6a 05       MVI     B,$05              // six voices
-0afe: 6c ff       MVI     D,$FF              // set up DE as a pointer
-0b00: 34 80 ff    LXI     HL,$FF80_voiceTbl
-0b03: 2b          LDAX    (HL)               // voice number
-0b04: 1d          MOV     E,A                // DE points to note table
-0b05: 2a          LDAX    (DE)               // get the note that's being played
-0b06: 07 7f       ANI     A,$7F              // mask off the play/stop bit
-0b08: 60 eb       NEA     A,C                // A != C?
-0b0a: d0          JR      $0B1B              // found it
-0b0b: 32          INX     HL                 // next voice 
-0b0c: 52          DCR     B                  // count down
+0afe: 6c ff       MVI     D,$FF              // DE will be a pointer into noteTbl
+0b00: 34 80 ff    LXI     HL,$FF80_voiceTbl  // start at the beginning of voiceTbl
+
+// loop until we find the note
+0b03: 2b          LDAX    (HL)               // find which voice is in this slot
+0b04: 1d          MOV     E,A                // lower byte of DE, now points to the note table
+0b05: 2a          LDAX    (DE)               // get the note that is currently set
+0b06: 07 7f       ANI     A,$7F              // mask off the "free" bit
+0b08: 60 eb       NEA     A,C                // if A != C skip next instruction
+0b0a: d0          JR      $0B1B              // found it, proceed to bubble the voice along
+0b0b: 32          INX     HL                 // try the next voice 
+0b0c: 52          DCR     B                  // count down the voices, skipping if the counter rolls over
 0b0d: f5          JR      $0B03              // loop
-0b0e: a2          POP     DE                 // return
+0b0e: a2          POP     DE                 // return, we didn't find the note in noteTbl
 0b0f: a1          POP     BC
 0b10: a3          POP     HL
-0b11: b8          RET     
-0b12: 2b          LDAX    (HL)
-0b13: 1b          MOV     C,A
-0b14: af 01       LDAX    (HL+$01)
-0b16: 3b          STAX    (HL)
-0b17: 0b          MOV     A,C
-0b18: bf 01       STAX    (HL+$01)
+0b11: b8          RET
+// loop around, bubble the freed voice to the end of voiceTbl
+0b12: 2b          LDAX    (HL)              // fetch this voice
+0b13: 1b          MOV     C,A               
+0b14: af 01       LDAX    (HL+$01)          // and the next voice
+0b16: 3b          STAX    (HL)              // swap them around
+0b17: 0b          MOV     A,C               
+0b18: bf 01       STAX    (HL+$01)          
 0b1a: 32          INX     HL
-0b1b: 52          DCR     B                  // count down B anyway
-0b1c: f5          JR      $0B12              // if we're not done yet loop
-0b1d: 2a          LDAX    (DE)               // get note
-0b1e: 17 80       ORI     A,$80              // OR in "note off"
+// enter the loop here, counting B down by one so we don't run off the end of the table
+0b1b: 52          DCR     B                  // count down B, skip if the counter rolls over
+0b1c: f5          JR      $0B12              // it did not, loop
+// once we're done with the loop
+0b1d: 2a          LDAX    (DE)               // get the note we found in the first part
+0b1e: 17 80       ORI     A,$80              // OR in "voice off" flag
 0b20: 3a          STAX    (DE)               // save it back
-0b21: 0d          MOV     A,E                // 
-0b22: 66 08       SUI     A,$08              // subtract 8 from the voice number
+0b21: 0d          MOV     A,E                // "voice off" commands are $80 to $85 so...
+0b22: 66 08       SUI     A,$08              // ... subtract 8 from the voice number
 0b24: 1b          MOV     C,A                // to put the correct command value in C
-0b25: 69 fd       MVI     A,$FD // select module board
+0b25: 69 fd       MVI     A,$FD              // select module board
 0b27: 79 e8       CALF    $09E8_sendToTx
 0b29: 0b          MOV     A,C
 0b2a: 79 e8       CALF    $09E8_sendToTx     // send 0x80 to 0x85 to the module board
@@ -1747,7 +1768,7 @@ test mode voice off cyclic thing
 0b31: b1          PUSH    BC
 0b32: 1b          MOV     C,A
 0b33: 6a 05       MVI     B,$05
-0b35: 34 88 ff    LXI     HL,$FF88_noteTbl
+0b35: 34 88 ff    LXI     HL,noteTbl
 0b38: 2b          LDAX    (HL)
 0b39: 47 80       ONI     A,$80
 0b3b: c6          JR      $0B42
@@ -1778,7 +1799,7 @@ note in A
 0b57: 74 c0 be    ADDW    $FFBE_transpose
 0b5a: 1b          MOV     C,A
 0b5b: 6a 05       MVI     B,$05              // six voices
-0b5d: 34 88 ff    LXI     HL,$FF88_noteTbl           // note table
+0b5d: 34 88 ff    LXI     HL,noteTbl           // note table
 0b60: 69 fd       MVI     A,$FD // select module board
 0b62: 79 e8       CALF    $09E8_sendToTx
 0b64: 0f          MOV     A,L                // voice on
@@ -1806,20 +1827,35 @@ stop all notes
 0b7f: a1          POP     BC
 0b80: b8          RET 
 
-set up new voice allocation table
-0b81: 34 88 ff    LXI     HL,$FF88_noteTbl   // $FF88_noteTbl contains six bytes of $80
+
+//set up new voice allocation table
+// the table at $FF80 contains initially values from $88 to $8D
+// these represent two things - the address in the note table for a given voice,
+// and also the command to send to the module board controller IC29 to start
+// the voice
+// the table at $FF88 contains the note currently being played by that voice
+// (before transpose is applied)
+// this is ORed with $80 to indicate that the voice is free
+
+// fill the note table with $80 to indicate all voices free
+0b81: 34 88 ff    LXI     HL,noteTbl
 0b84: 6a 05       MVI     B,$05
 0b86: 69 80       MVI     A,$80
 0b88: 3d          STAX    (HL+)
 0b89: 52          DCR     B
 0b8a: fd          JR      $0B88
-0b8b: 34 80 ff    LXI     HL,$FF80_voiceTbl   // $FF80_voiceTbl contains $88 to $8D
+
+// fill the voice table with the values $88 to $8D, representing
+// the addresses in the note table and "Voice On" commands
+0b8b: 34 80 ff    LXI     HL,$voiceTbl
 0b8e: 6a 05       MVI     B,$05
 0b90: 69 88       MVI     A,$88
 0b92: 3d          STAX    (HL+)
 0b93: 41          INR     A
 0b94: 52          DCR     B
 0b95: fc          JR      $0B92
+
+// $FF86 is used as a "voice counter" in some modes
 0b96: 71 86 88    MVIW    $FF86,$88  // finally $FF86 contains $88, first voice
 0b99: b8          RET
 
