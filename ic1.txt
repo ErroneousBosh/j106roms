@@ -1536,6 +1536,7 @@ in FFC3 where it's XORed to see if a note has changed
 0a3a: c7          JR      $0A42          // not test mode, skip
 0a3b: 7a 88       CALF    $0A88          // cycle round voices
 0a3d: 4e 21       JRE     $0A60          // jump on and do next note
+
 -----------------------------------------------------------
 Poly 1 Note On handler
 -----------------------------------------------------------
@@ -1642,7 +1643,11 @@ called with note number in L, note to play in C
 //-----------------------------------------------------------
 // real Poly 1 note on assigner
 //-----------------------------------------------------------
-
+// called with the note to play in C
+// if there's a slot free (last voice in table is not playing)
+// then check to see if there's a voice previously used to play this note
+// that can be restarted, and if not just play it on the first free voice
+// in the table
 0aaf: b3          PUSH    HL
 0ab0: b1          PUSH    BC
 0ab1: b2          PUSH    DE
@@ -1650,47 +1655,60 @@ called with note number in L, note to play in C
 0ab3: 6a 05       MVI     B,$05              // six voices
 0ab5: 6c ff       MVI     D,$FF              // upper byte of pointer
 0ab7: 34 85 ff    LXI     HL,voiceTbl+5
-0aba: 2b          LDAX    (HL)               // get voice
-0abb: 1d          MOV     E,A                // form the address of the note-for-voice in DE
-0abc: 2a          LDAX    (DE)               // get note pointed to from note table
-0abd: 57 80       OFFI    A,$80              // bit7?
-0abf: ca          JR      $0ACA              // is set, last note is free
-0ac0: a2          POP     DE                 // return if all notes are used, no voice stealing here!
+0aba: 2b          LDAX    (HL)               // get the last voice in the table
+0abb: 1d          MOV     E,A                // DE now points at the note for this voice
+0abc: 2a          LDAX    (DE)               // get the note
+0abd: 57 80       OFFI    A,$80              // bit 7 set means the note is free
+0abf: ca          JR      $0ACA              // it's free
+0ac0: a2          POP     DE                 // last note is not free, return without assigning
 0ac1: a1          POP     BC
 0ac2: a3          POP     HL
-0ac3: b8          RET     
-// assigner loop
-// run backwards through the voice table looking for the last unused one
+0ac3: b8          RET
 
+// voice assigner loop
+// get the next voice pointed to and test if it's free
+// if it is not, break out of the loop, we've tried all free voices
+// and not found a voice to restart
 0ac4: 2b          LDAX    (HL)               // fetch next voice
 0ac5: 1d          MOV     E,A                // form address
 0ac6: 2a          LDAX    (DE)               // fetch note number
-0ac7: 47 80       ONI     A,$80              // test if top bit is set
-0ac9: c8          JR      $0AD2              // no, jump to tried all voices?
+0ac7: 47 80       ONI     A,$80              // if the top bit is not set
+0ac9: c8          JR      $0AD2              // we've found the first non-free voice
 // assigner loop entry point
+// start by finding if we are restarting a note
 0aca: 07 7f       ANI     A,$7F              // mask off top bit of note from table
 0acc: 60 eb       NEA     A,C                // is this the same as the note we want to play?
-0ace: d1          JR      $0AE0              // yes it is, re-enable the voice
-0acf: 33          DCX     HL                 // count down a voice
-0ad0: 52          DCR     B                  // one less to try
-0ad1: f2          JR      $0AC4              // loop back for next voice, if we have any left to do
-// didn't find existng voice in table
-0ad2: 32          INX     HL                 // tried all voices, point to first voice in table
+0ace: d1          JR      $0AE0              // yes it is, play the voice
+0acf: 33          DCX     HL                 // next voice down
+0ad0: 52          DCR     B                  // loop counter
+0ad1: f2          JR      $0AC4              // if there are voices left to do, go back
+
+// didn't find this note in the table, that was previously used by a voice
+0ad2: 32          INX     HL                 // step back up to the first free voice
 0ad3: 2b          LDAX    (HL)               // get voice number
-0ad4: 1d          MOV     E,A                // form the address in the note table in DE
+0ad4: 1d          MOV     E,A                // DE now has the address for this voice's note
 0ad5: 0b          MOV     A,C                // note number in A, voice number in E
-0ad6: ce          JR      $0AE5              // jump ahead to store and send
-0ad7: 33          DCX     HL                 // count down
-0ad8: af 01       LDAX    (HL+$01)           // get voice in next slot up
-0ada: 1b          MOV     C,A                // save
-0adb: 2b          LDAX    (HL)               // get this voice
-0adc: bf 01       STAX    (HL+$01)           // save in next slot up
-0ade: 0b          MOV     A,C                // restore
-0adf: 3b          STAX    (HL)               // swap voices
+0ad6: ce          JR      $0AE5              // store note in table, send command to module board
+
+// restart voice loop
+0ad7: 33          DCX     HL                 // next voice down
+0ad8: af 01       LDAX    (HL+$01)           // swap the voice above
+0ada: 1b          MOV     C,A                // with this voice
+0adb: 2b          LDAX    (HL)
+0adc: bf 01       STAX    (HL+$01)
+0ade: 0b          MOV     A,C
+0adf: 3b          STAX    (HL)
+
+// restart an existing voice
+// bubble the voice to be restarted to the start of the table, leaving
+// any unused "off" voices alone
+// start by counting down one of the voices so we do the right amount
 0ae0: 52          DCR     B                  // count down voices to try
-0ae1: f5          JR      $0AD7              // loop back around
-0ae2: 2a          LDAX    (DE)               // ran out of voices, get note
-0ae3: 07 7f       ANI     A,$7F              // mask off top bit
+0ae1: f5          JR      $0AD7              // loop back if there are voices left to do
+
+0ae2: 2a          LDAX    (DE)               // fetch note from table
+0ae3: 07 7f       ANI     A,$7F              // mask bit 7 to mark this as playing
+// save note and send to module board
 0ae5: 3a          STAX    (DE)               // save it back
 0ae6: 74 c0 be    ADDW    $FFBE_transpose    // add transpose
 0ae9: 1b          MOV     C,A                // save to C
