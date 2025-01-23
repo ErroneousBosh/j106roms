@@ -439,19 +439,19 @@ set up testmode
 0310: 07 f9       ANI     A,$F9              ; mask off poly mode LEDs
 0312: 60 9b       ORA     A,C                ; OR in switch values
 0314: 63 c8       STAW    $FFC8_ledCol3      ; save it back
-0316: 25 b1 00    GTIW    $FFB1,$00
-0319: 4e 41       JRE     $035C
-031b: 01 b1       LDAW    $FFB1
-031d: 7c 9d       CALF    $0C9D
-031f: 07 0f       ANI     A,$0F
-0321: 63 bb       STAW    $FFBB_patch
-0323: 5a a9       BIT     2,$FFA9
-0325: 4e 20       JRE     $0347
-0327: 64 4a 10    ONI     PC,$10
-032a: 4e 7a       JRE     $03A6
-032c: 5a b6       BIT     2,$FFB6
-032e: c2          JR      $0331
-032f: 4e 75       JRE     $03A6
+0316: 25 b1 00    GTIW    $FFB1,$00         // check for any patch buttons pressed
+0319: 4e 41       JRE     $035C             // no
+031b: 01 b1       LDAW    $FFB1             // fetch patch buttons
+031d: 7c 9d       CALF    $0C9D             // convert it to patch number
+031f: 07 0f       ANI     A,$0F             // mask off any upper bits, can't see why there would be any
+0321: 63 bb       STAW    $FFBB_patch       // store into patch
+0323: 5a a9       BIT     2,$FFA9           // write button pressed
+0325: 4e 20       JRE     $0347             // no
+0327: 64 4a 10    ONI     PC,$10            // memory protect switch grounds pin
+032a: 4e 7a       JRE     $03A6             // pin is low, protected
+032c: 5a b6       BIT     2,$FFB6           // flag set at $0d18, cleared at $02b1,$02c3
+032e: c2          JR      $0331             // flag is low
+032f: 4e 75       JRE     $03A6             // flag is high
 0331: 01 b9       LDAW    $FFB9
 0333: 07 f0       ANI     A,$F0
 0335: 1a          MOV     B,A
@@ -511,7 +511,7 @@ set up testmode
 03a6: 5a a9       BIT     2,$FFA9   // MANUAL set
 03a8: 58 b5       BIT     0,$FFB5   // patch shift pedal?
 03aa: 4e 28       JRE     $03D4
-03ac: 59 b6       BIT     1,$FFB6
+03ac: 59 b6       BIT     1,$FFB6   // something to do with retaining switches1 data
 03ae: c6          JR      $03B5
 03af: 7c 3c       CALF    $0C3C
 03b1: 01 bb       LDAW    $FFBB_patch
@@ -2011,6 +2011,9 @@ send switches2 to module board
 
 // test bits, juggle switches around
 // store switches1 bits in FFB8
+// seems to do something like, test if the switches have been sent to the module board
+// return if they have
+// save the "latched" value at FFB8 and clear the flag if they have not
 0c3c: 59 b6       BIT     1,$FFB6           // might be to do with manual mode?
 0c3e: c7          JR      $0C46             // return
 0c3f: 01 8e       LDAW    $FF8E_switches1
@@ -2079,46 +2082,52 @@ decimal points off?
 0c99: 05 c6 ef    ANIW    $FFC6_rightDigit,$EF
 0c9c: b8          RET
 
-shift bits in a and count?
-0c9d: 6a 01       MVI     B,$01
-0c9f: 48 01       SLRC    A
-0ca1: c2          JR      $0CA4
-0ca2: 0a          MOV     A,B
+// find out the value of the keypad button pressed
+// called with the button value in A
+// returns 1-8 in A
+0c9d: 6a 01       MVI     B,$01     // set up
+0c9f: 48 01       SLRC    A         // shift the bit in A right
+0ca1: c2          JR      $0CA4     // skpped if a bit is now in carry
+0ca2: 0a          MOV     A,B       // return the count in A
 0ca3: b8          RET
-
-0ca4: 42          INR     B
-0ca5: f9          JR      $0C9F
-0ca6: b8          RET
+0ca4: 42          INR     B         // carry still clear
+0ca5: f9          JR      $0C9F     // repeat
+0ca6: b8          RET               // if B rolled over return
 
 calculate address for patch data
 $0CA7_calcPatchAddr
-0ca7: 58 b6       BIT     0,$FFB6 // test mode?    // are we in test mode
-0ca9: c8          JR      $0CB2      // no, skip ahead
-0caa: 6e 0f       MVI     H,$0F      // address is $0f00
-0cac: 07 f0       ANI     A,$F0 
-0cae: 46 70       ADI     A,$70      
-0cb0: 1f          MOV     L,A        // address is now $0f80 to $fd0
-0cb1: dd          JR      $0CCF      // return
-0cb2: 01 bb       LDAW    $FFBB_patch      // patch digit?
-0cb4: 51          DCR     A          // -1
-0cb5: 1b          MOV     C,A        // save
+0ca7: 58 b6       BIT     0,$FFB6       // is test mode selected?
+0ca9: c8          JR      $0CB2         // no, skip ahead
+0caa: 6e 0f       MVI     H,$0F         // yes, "test" patches are at $0f80
+0cac: 07 f0       ANI     A,$F0         // 8 selected by bank bits, $10 to $80
+0cae: 46 70       ADI     A,$70         // add the offset
+0cb0: 1f          MOV     L,A           // address is now $0f80 to $fd0
+0cb1: dd          JR      $0CCF         // return
+// calculate "real" patch address
+0cb2: 01 bb       LDAW    $FFBB_patch     // patch digit
+0cb4: 51          DCR     A               // -1, patch is now $00-$07
+0cb5: 1b          MOV     C,A             // save
 0cb6: 01 ba       LDAW    $FFBA_bank      // bank digit
-0cb8: 66 10       SUI     A,$10      // -16
-0cba: 48 21       SLR     A          // double it
-0cbc: 60 9b       ORA     A,C        // OR in patch digit
-0cbe: 5e c8       BIT     6,$FFC8_ledCol3    // set for group A
-0cc0: 17 40       ORI     A,$40      // not set, group B
-0cc2: 44 00 02    LXI     EA,$0200   // form the address in RAM
-0cc5: 19          MOV     EAL,A      // address
+0cb8: 66 10       SUI     A,$10           // -16, bank is now $00-$70
+0cba: 48 21       SLR     A               // shift right, bank is now $00-$38
+0cbc: 60 9b       ORA     A,C             // OR in patch digit
+0cbe: 5e c8       BIT     6,$FFC8_ledCol3 // set for group A
+0cc0: 17 40       ORI     A,$40           // not set, group B
+0cc2: 44 00 02    LXI     EA,$0200        // form the address in RAM
+0cc5: 19          MOV     EAL,A           // address is now $02nn
 0cc6: 48 a4       DSLL    EA
 0cc8: 48 a4       DSLL    EA
 0cca: 48 a4       DSLL    EA
-0ccc: 48 a4       DSLL    EA         // multiply by 16 bytes
-0cce: b7          DMOV    HL,EA      // HL now looks like $2nn0
-0ccf: b8          RET                // return
+0ccc: 48 a4       DSLL    EA              // multiply by 16 bytes
+0cce: b7          DMOV    HL,EA           // HL now looks like $2nn0
+0ccf: b8          RET                     // return
 
-change patch
-called with patch value in C
+
+// misdescribed! this actually sends the patch to the module board
+// and copies from the patch memory to the active patch RAM
+//change patch
+//called with patch value in C
+
 $0cd0_changePatch
 0cd0: 69 fd       MVI     A,$FD              // select module board
 0cd2: 79 e8       CALF    $09E8_sendToTx
@@ -2155,23 +2164,24 @@ decodes bit 7 into C and returns it to send to the switches
 0d04: f0          JR      $0CF5      // loop back around for next byte
 0d05: b8          RET
 
-something to do with patches, possibly packing?
+//something to do with patches, possibly packing?
+// called from $0343 and $038e
 0d06: 0b          MOV     A,C
 0d07: 63 b9       STAW    $FFB9
-0d09: 7c a7       CALF    $0CA7_calcPatchAddr
-0d0b: 24 90 ff    LXI     DE,$FF90_patchRam
-0d0e: 01 8e       LDAW    $FF8E_switches1
+0d09: 7c a7       CALF    $0CA7_calcPatchAddr   // get address of patch in RAM
+0d0b: 24 90 ff    LXI     DE,$FF90_patchRam     // current patch values
+0d0e: 01 8e       LDAW    $FF8E_switches1       // latched state of switch 1
 0d10: 1b          MOV     C,A
-0d11: 7d 25       CALF    $0D25
-0d13: 01 8f       LDAW    $FF8F_switches2
+0d11: 7d 25       CALF    $0D25                 // encode the switch values into the top bits
+0d13: 01 8f       LDAW    $FF8F_switches2       // same again for switch 2
 0d15: 1b          MOV     C,A
 0d16: 7d 25       CALF    $0D25
-0d18: 15 b6 04    ORIW    $FFB6,$04
-0d1b: 7c 3c       CALF    $0C3C
-0d1d: 01 b9       LDAW    $FFB9
+0d18: 15 b6 04    ORIW    $FFB6,$04             // this flag
+0d1b: 7c 3c       CALF    $0C3C                 // save switches1 value
+0d1d: 01 b9       LDAW    $FFB9                 
 0d1f: 1b          MOV     C,A
 0d20: 7c d0       CALF    $0cd0_changePatch
-0d22: 7c 93       CALF    $0C93
+0d22: 7c 93       CALF    $0C93                 // blank decimal points
 0d24: b8          RET
 
 encode switches byte into upper bits?
