@@ -61,6 +61,7 @@ serial handler
 0070: 8f 8e 9e ab bb ee fe 2f 8b
 
 // start of code proper
+// this is jumped to from $0eaa which might be up in the tape routine
 0079: 69 00       MVI     A,$00
 007b: 4d c1       MOV     PB,A
 007d: 4d c5       MOV     PF,A
@@ -76,10 +77,12 @@ serial handler
 0092: 7c 54       CALF    $0C54
 0094: 75 cd 10    EQIW    $FFCD,$10     // wait a bit more
 0097: fc          JR      $0094
-0098: 7b 81       CALF    $0b81_clrVoiceTbl // set up RAM
+0098: 7b 81       CALF    $0b81_clrVoiceTbl // set up tables in RAM for voices and notes
 009a: 4e 71       JRE     $010D
 
-// startup
+//-----------------------------------------------------------
+// Cold Start after reset
+//-----------------------------------------------------------
 009c: 69 0e       MVI     A,$0E          // RAM on, 16kB mode, PF6-7 port mode
 009e: 4d d0       MOV     MM,A           // set memory map
 00a0: 69 0e       MVI     A,$0E          // serial mode clock 24x prescale, RX and TX on
@@ -91,11 +94,15 @@ serial handler
 00ad: 10          EXA                    // both register sets
 00ae: 68 ff       MVI     V,$FF          // vector pointer to RAM
 00b0: 04 ff ff    LXI     SP,$FFFF       // stack pointer
-00b3: 69 00       MVI     A,$00          // clear the RAM
-00b5: 34 00 ff    LXI     HL,$FF00
+
+// loop around clearing RAM
+00b3: 69 00       MVI     A,$00
+00b5: 34 00 ff    LXI     HL,$FF00       // first internal RAM
 00b8: 3d          STAX    (HL+)
 00b9: 74 7f 00    EQI     L,$00          // Check if HL has wrapped
-00bc: fb          JR      $00B8          // if it has this is skipped, if not loop back around
+00bc: fb          JR      $00B8          // it has not, loop
+
+// set up hardware
 00bd: 69 03       MVI     A,$03          // port C serial on, all others GPIO
 00bf: 4d d1       MOV     MCC,A
 00c1: 69 3a       MVI     A,$3A          // PC7, PC6, PC2, PC0 output (6+7 tape, 0 MIDI/module out, 2 module select)
@@ -351,21 +358,21 @@ set up testmode
 0271: 78 5c       CALF    $085C      // tell the module board to zero the DAC
 0273: 01 a8       LDAW    $FFA8_midiSwitch
 0275: 48 21       SLR     A          // 
-0277: 07 38       ANI     A,$38
-0279: 1b          MOV     C,A
-027a: 01 c8       LDAW    $FFC8_ledCol3
-027c: 07 c7       ANI     A,$C7      // mask out load/save/verify
-027e: 60 9b       ORA     A,C
-0280: 63 c8       STAW    $FFC8_ledCol3  // save it back
-0282: 75 ba 10    EQIW    $FFBA_bank,$10
+0277: 07 38       ANI     A,$38             // switch value bits
+0279: 1b          MOV     C,A               // store it
+027a: 01 c8       LDAW    $FFC8_ledCol3     // 
+027c: 07 c7       ANI     A,$C7             // mask out load/save/verify
+027e: 60 9b       ORA     A,C               // LEDs indicate MIDI mode?
+0280: 63 c8       STAW    $FFC8_ledCol3     // save it back
+0282: 75 ba 10    EQIW    $FFBA_bank,$10    // bank button 5
 0285: cf          JR      $0295
-0286: 59 cd       BIT     1,$FFCD
+0286: 59 cd       BIT     1,$FFCD           // interrupt counter
 0288: c7          JR      $0290
-0289: 5f b6       BIT     7,$FFB6
-028b: 69 30       MVI     A,$30
+0289: 5f b6       BIT     7,$FFB6           // flag byte
+028b: 69 30       MVI     A,$30             // C
 028d: 7b 55       CALF    $0B55_noteOnUnison
 028f: c5          JR      $0295
-0290: 5f b6       BIT     7,$FFB6
+0290: 5f b6       BIT     7,$FFB6           
 0292: c2          JR      $0295
 0293: 7b 70       CALF    $0B70_stopAllNotes
 0295: 25 aa 00    GTIW    $FFAA,$00
@@ -501,8 +508,8 @@ set up testmode
 039f: 79 29       CALF    $0929
 03a1: 45 a8 30    ONIW    $FFA8_midiSwitch,$30 (MIDI Func1+2)
 03a4: 78 f0       CALF    $08f0_sendSysexPatch
-03a6: 5a a9       BIT     2,$FFA9
-03a8: 58 b5       BIT     0,$FFB5
+03a6: 5a a9       BIT     2,$FFA9   // MANUAL set
+03a8: 58 b5       BIT     0,$FFB5   // patch shift pedal?
 03aa: 4e 28       JRE     $03D4
 03ac: 59 b6       BIT     1,$FFB6
 03ae: c6          JR      $03B5
@@ -767,7 +774,9 @@ set up testmode
 0593: aa          EI      
 0594: 62          RETI
 
-Serial Interrupt Handler
+//-----------------------------------------------------------
+// Serial interrupt Handler
+//-----------------------------------------------------------
 0595: 10          EXA     
 0596: 11          EXX     
 0597: 64 5e 04    OFFI    MKH,$04    // if the TX interrupt is masked
@@ -802,7 +811,7 @@ Serial Interrupt Handler
 05d2: 71 a1 80    MVIW    $FFA1,$80
 05d5: 75 a0 00    EQIW    $FFA0,$00
 05d8: 71 a0 80    MVIW    $FFA0,$80
-05db: d3          JR      $05EF      // restore registers and return from interrupt      // restore registers and return from interrupt
+05db: d3          JR      $05EF         // restore registers and return from interrupt
 
 handle control change
 05dc: 1b          MOV     C,A            // save A
@@ -820,7 +829,7 @@ return from interrupt
 05f0: 11          EXX     
 05f1: aa          EI      
 05f2: 62          RETI
-//
+
 
 05f3: 67 c0       NEI     A,$C0
 05f5: c4          JR      $05FA      // handle patch change
@@ -1193,7 +1202,7 @@ send Omni Off Poly
 0859: 79 e8       CALF    $09E8_sendToTx
 085b: b8          RET     
 
-send Zero DAC command to module board
+// send Zero DAC command to module board
 085c: 69 fd       MVI     A,$FD // select module board
 085e: 79 e8       CALF    $09E8_sendToTx
 0860: 69 8f       MVI     A,$8F         // switches 2
@@ -2006,19 +2015,26 @@ send switches2 to module board
 0c3e: c7          JR      $0C46             // return
 0c3f: 01 8e       LDAW    $FF8E_switches1
 0c41: 63 b8       STAW    $FFB8
-0c43: 05 b6 fd    ANIW    $FFB6,$FD         // clear bit
+0c43: 05 b6 fd    ANIW    $FFB6,$FD         // clear FFC7/FFB8 bit
 0c46: b8          RET
 
-manual mode middle bars
+//-----------------------------------------------------------
+// Select Manual mode
+//-----------------------------------------------------------
 0c47: 71 b7 00    MVIW    $FFB7,$00
 0c4a: 71 c5 04    MVIW    $FFC5_leftDigit,$04
 0c4d: 71 c6 04    MVIW    $FFC6_rightDigit,$04
-0c50: 01 c7       LDAW    $FFC7
 
-// test a value, might be Manual mode
+// what I think is going on here is that the values in FFC7 are "same as last time"
+// depending on what we're doing either use "change this from panel" or "same as last time"
+0c50: 01 c7       LDAW    $FFC7 // switches1 as sent to module board at $0bf9
+
+// this bit is set after setting the patch to "manual"
 0c52: 59 b6       BIT     1,$FFB6
 
-// called from startup routine
+//-----------------------------------------------------------
+// Read panel for manual mode
+//-----------------------------------------------------------
 0c54: 01 b8       LDAW    $FFB8             // latched switches1 value?
 0c56: 63 8e       STAW    $FF8E_switches1
 0c58: 7b f9       CALF    $0BF9_sw1ToModule
