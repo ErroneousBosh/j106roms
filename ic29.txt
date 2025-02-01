@@ -448,52 +448,59 @@ Set DAC to Zero command for test mode
 027f: 00          NOP     
 
 cold start
-0280: 69 0e       MVI     A,$0E
+0280: 69 0e       MVI     A,$0E         // RAM on, 16kB mode, PF6-7 port mode
 0282: 4d d0       MOV     MM,A
-0284: 68 ff       MVI     V,$FF
+0284: 68 ff       MVI     V,$FF         // vector register for "working register" instructions
 0286: 10          EXA     
-0287: 68 ff       MVI     V,$FF
-0289: 04 ff ff    LXI     SP,$FFFF
-028c: 69 00       MVI     A,$00
-028e: 4d d2       MOV     MA,A
-0290: 4d d3       MOV     MB,A
-0292: 4d d4       MOV     MC,A
-0294: 4d d7       MOV     MF,A
-0296: 4d c8       MOV     ANM,A
+0287: 68 ff       MVI     V,$FF         // in both reg sets
+0289: 04 ff ff    LXI     SP,$FFFF      // top of RAM
+028c: 69 00       MVI     A,$00         
+028e: 4d d2       MOV     MA,A          // set to output for MUX inhibit pins
+0290: 4d d3       MOV     MB,A          // DAC upper bits in D0-D4, rest unused
+0292: 4d d4       MOV     MC,A          // DAC lower bits in D2-D7, D1 serial in, D0 unused
+0294: 4d d7       MOV     MF,A          // Address upper bits in D0-D5, prescale range in D6-D7
+0296: 4d c8       MOV     ANM,A         // ADC fast mode, scan mode
 0298: 34 00 ff    LXI     HL,$FF00       // bottom of RAM
 029b: 3d          STAX    (HL+)
 029c: 74 7f 00    EQI     L,$00
 029f: fb          JR      $029B          // loop around until RAM is cleared
-02a0: 69 02       MVI     A,$02
+02a0: 69 02       MVI     A,$02         // MCC = PC1 is RXD, all the rest outputs
 02a2: 4d d1       MOV     MCC,A
-02a4: 69 4e       MVI     A,$4E
+02a4: 69 4e       MVI     A,$4E         // Serial mode 16x prescale, 8 bit, 1 stop bit
 02a6: 4d ca       MOV     SML,A
-02a8: 69 0a       MVI     A,$0A
-02aa: 4d c9       MOV     SMH,A
+02a8: 69 0a       MVI     A,$0A         // Serial mode RX Enable, TX disable, internal clock /24
+02aa: 4d c9       MOV     SMH,A         
+
+// 12MHz master clock, divided by 16, divided by 24 gives 31250bps or MIDI rate
+
+// initialise all six voices to Middle C
+// "MIDI" notes from assigner board are stored at $FF09-$FF0E
 02ac: 34 09 ff    LXI     HL,$FF09_voice1Note
 02af: 6b 05       MVI     C,$05          // six voices
 02b1: 69 3c       MVI     A,$3C          // Middle C
-02b3: 3d          STAX    (HL+)          // initialise Note setting
+02b3: 3d          STAX    (HL+)
 02b4: 53          DCR     C
 02b5: fd          JR      $02B3          // loop around
-02b6: 64 05 40    MVI     PF,$40         // 8' divider
-02b9: 71 1e 40    MVIW    $FF1E_flags1,$40 // sqr off/on
-02bc: 71 46 15    MVIW    $FF46_ic40Latch,$15
-02bf: 71 37 06    MVIW    $FF37_switch2,$06
-02c2: 14 80 3f    LXI     BC,$3F80       // env, cutoff to maximum
+
+// configure the hardware
+02b6: 64 05 40    MVI     PF,$40                // 8' divider
+02b9: 71 1e 40    MVIW    $FF1E_flags1,$40      // sqr off/on
+02bc: 71 46 15    MVIW    $FF46_ic40Latch,$15   // saw high, HPF B low, HPF A high, Chorus 1 low, Chorus on/off high
+02bf: 71 37 06    MVIW    $FF37_switch2,$06     // 
+02c2: 14 80 3f    LXI     BC,$3F80              // env, cutoff to maximum
 02c5: 70 1e 23 ff SBCD    $FF23_envSustainLev
 02c9: 70 1e 3d ff SBCD    $FF3D_vcfCutoff
-02cd: 14 00 20    LXI     BC,$2000       // VCA about half way up
+02cd: 14 00 20    LXI     BC,$2000              // VCA about half way up
 02d0: 70 1e 43 ff SBCD    $FF43_vcaMaster
-02d4: 14 00 02    LXI     BC,$0200       // LFO rate slow
+02d4: 14 00 02    LXI     BC,$0200              // LFO rate slow
 02d7: 70 1e 4b ff SBCD    $FF4B_lfoRateCoeff
-02db: 34 00 23    LXI     HL,$2300       // program dividers
+02db: 34 00 23    LXI     HL,$2300              // program dividers
 02de: 78 25       CALF    $0825_setModeWord
 02e0: 34 00 13    LXI     HL,$1300
 02e3: 78 25       CALF    $0825_setModeWord
-02e5: 48 48       SKIT    FAD
+02e5: 48 48       SKIT    FAD                   // clear ADC interrupt
 02e7: 00          NOP     
-02e8: 64 06 04    MVI     MKH,$04
+02e8: 64 06 04    MVI     MKH,$04               // mask serial transmit interrupt, unmask serial receive and AD interrupts
 02eb: aa          EI
 
 here's the main loop
@@ -508,33 +515,38 @@ here's the main loop
 02fd: 01 10       LDAW    $FF10_noteGate     // sustain is off, just load the gated voice
 02ff: 63 11       STAW    $FF11_voiceRun     // into the running voice value
 
+// output VCF resonance CV
 0301: 34 3f ff    LXI     HL,$FF3F_vcfReso
-0304: 48 83       LDEAX   (HL)
+0304: 48 83       LDEAX   (HL)               // resonance into EA
 0306: 69 06       MVI     A,$06              // VCF Resonance CV output
 0308: 78 2f       CALF    $082F_loadDac
-030a: 64 08 bf    ANI     PA,$BF             // IC26 VCA CV mux
-030d: 45 11 3f    ONIW    $FF11_voiceRun,$3F          // are any voices started
-0310: 4e 59       JRE     $036B              // no
-0312: 5b 1e       BIT     3,$FF1E_flags1     // yes but we've already started the LFO delay
-0314: ce          JR      $0323
-0315: 14 00 00    LXI     BC,$0000           // no
-0318: 70 1e 56 ff SBCD    $FF56_lfoHoldOff   // zero out the holdoff time and envelope
+030a: 64 08 bf    ANI     PA,$BF             // IC26 VCA CV mux uninhibited
+
+// start LFO envelope calculation
+030d: 45 11 3f    ONIW    $FF11_voiceRun,$3F        // are any voices started
+0310: 4e 59       JRE     $036B                     // no
+0312: 5b 1e       BIT     3,$FF1E_flags1            // yes but check if we've already started the LFO delay
+0314: ce          JR      $0323                     // bit 3 is clear
+0315: 14 00 00    LXI     BC,$0000                  // bit 3 is set
+0318: 70 1e 56 ff SBCD    $FF56_lfoHoldOff          // zero out the holdoff time and envelope
 031c: 70 1e 5a ff SBCD    $FF5A_lfoDelayEnv
 0320: 05 1e f1    ANIW    $FF1E_flags1,$F1           // clear LFO delay bits        
 0323: 59 1e       BIT     1,$FF1E_flags1             // LFO holdoff time
-0325: 4e 49       JRE     $0370
+0325: 4e 49       JRE     $0370                      // bit 1 is low, jump to $370
 0327: 5a 1e       BIT     2,$FF1E_flags1             // LFO attack time
-0329: 4e 5d       JRE     $0388
+0329: 4e 5d       JRE     $0388                      // bit 2 is low, jump to $388
 032b: 6a ff       MVI     B,$FF                      // maximum LFO amount
+
+// perform the LFO amount calculations
 032d: b1          PUSH    BC
-032e: 01 49       LDAW    $FF49_lfoToPitchScaler     // 
-0330: 48 2e       MUL     B
-0332: 08          MOV     A,EAH
-0333: 74 a0 64    ADDNCW  $FF64_lfoModToPitch
-0336: 69 ff       MVI     A,$FF
-0338: 34 51 ff    LXI     HL,$FF51_lfoToPitch
-033b: 70 1f 4d ff LBCD    $FF4D_lfoVal
-033f: 48 2f       MUL     C
+032e: 01 49       LDAW    $FF49_lfoToPitchScaler     // this is the value from the lookup table
+0330: 48 2e       MUL     B                          
+0332: 08          MOV     A,EAH                      
+0333: 74 a0 64    ADDNCW  $FF64_lfoModToPitch        // add in modwheel amount, skip if it doesn't overflow
+0336: 69 ff       MVI     A,$FF                      // if it overflows clamp to $ff
+0338: 34 51 ff    LXI     HL,$FF51_lfoToPitch        // "final" LFO mod value
+033b: 70 1f 4d ff LBCD    $FF4D_lfoVal               // current LFO value
+033f: 48 2f       MUL     C                          // 16-bit multiply...
 0341: 1c          MOV     D,A
 0342: 08          MOV     A,EAH
 0343: 1b          MOV     C,A
@@ -544,12 +556,12 @@ here's the main loop
 0349: 48 a0       DSLR    EA
 034b: 48 a0       DSLR    EA
 034d: 48 a0       DSLR    EA
-034f: 48 95       STEAX   (HL++)
-0351: a1          POP     BC
-0352: 01 48       LDAW    $FF48_lfoToVcf
-0354: 48 2e       MUL     B
+034f: 48 95       STEAX   (HL++)                     // save it in lfoToPitch 
+0351: a1          POP     BC                         // get the envelope back
+0352: 01 48       LDAW    $FF48_lfoToVcf             // final LFO VCF mod value
+0354: 48 2e       MUL     B                 
 0356: 08          MOV     A,EAH
-0357: 70 1f 4d ff LBCD    $FF4D_lfoVal
+0357: 70 1f 4d ff LBCD    $FF4D_lfoVal               // multiply LFO by it
 035b: 48 2f       MUL     C
 035d: 1c          MOV     D,A
 035e: 08          MOV     A,EAH
@@ -558,8 +570,10 @@ here's the main loop
 0361: 48 2e       MUL     B
 0363: 70 43       EADD    EA,C
 0365: 48 a0       DSLR    EA
-0367: 48 93       STEAX   (HL)
-0369: 4e 36       JRE     $03A1
+0367: 48 93       STEAX   (HL)                        // save in lfotoCutoff
+0369: 4e 36       JRE     $03A1                       // jump ahead to the next DAC output
+
+// calculate the LFO onset delay envelope
 036b: 15 1e 08    ORIW    $FF1E_flags1,$08
 036e: 4f b3       JRE     $0323
 0370: 24 56 ff    LXI     DE,$FF56_lfoHoldOff
@@ -572,6 +586,7 @@ here's the main loop
 0380: c4          JR      $0385
 0381: 6a 00       MVI     B,$00
 0383: 4f a8       JRE     $032D
+
 0385: 15 1e 02    ORIW    $FF1E_flags1,$02
 0388: 34 5a ff    LXI     HL,$FF5A_lfoDelayEnv
 038b: 48 83       LDEAX   (HL)
@@ -585,11 +600,17 @@ here's the main loop
 039a: 15 1e 04    ORIW    $FF1E_flags1,$04
 039d: 6a ff       MVI     B,$FF
 039f: 4f 8c       JRE     $032D
+
+// 
 03a1: 69 06       MVI     A,$06                      // VCA Master gain
 03a3: 34 43 ff    LXI     HL,$FF43_vcaMaster
 03a6: 48 83       LDEAX   (HL)
 03a8: 78 2f       CALF    $082F_loadDac
 03aa: 64 08 df    ANI     PA,$DF                     // IC23 VCF CV mux
+
+// begin to calculate "master" pitch for all voices
+// throughout, EA will mostly have the 8.8 bit fixed-point pitch
+// with EAH holding the semitone and EAL holding the "fine tune" in 256ths of a tone
 03ad: 44 18 18    LXI     EA,$1818                   // basic pitch value
 03b0: 01 61       LDAW    $FF61_tuningAmt            // synth tune pot
 03b2: 5f 1e       BIT     7,$FF1E_flags1             // positive/negative value
@@ -598,7 +619,7 @@ here's the main loop
 03b7: c2          JR      $03BA
 03b8: 70 41       EADD    EA,A
 03ba: 70 1f 51 ff LBCD    $FF51_lfoToPitch           // computed LFO amount
-03be: 59 4a       BIT     1,$FF4A_lfoFlag             // LFO polarity
+03be: 59 4a       BIT     1,$FF4A_lfoFlag            // LFO polarity
 03c0: c3          JR      $03C4                      // add or subtract
 03c1: 74 e5       DSUB    EA,BC
 03c3: c2          JR      $03C6
