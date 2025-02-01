@@ -138,15 +138,15 @@ serial interrupt handler
 008e: 10          EXA     
 008f: 11          EXX     
 0090: 4c d9       MOV     A,RXB              // fetch the received byte
-0092: 47 80       ONI     A,$80              // is it a command byte
-0094: 4e 2e       JRE     $00C4              // yes
+0092: 47 80       ONI     A,$80              // is it a command byte?
+0094: 4e 2e       JRE     $00C4              // no, jump ahead and store value
 0096: 63 36       STAW    $FF36_cmdByte      // store it as the current command byte
-0098: 37 88       LTI     A,$88              // less than $88 (voice off, sustain on/off message)
+0098: 37 88       LTI     A,$88              // is it a voice off or sustain on/off message
 009a: 4e 6d       JRE     $0109_retSerialIsr              // no
-009c: 37 86       LTI     A,$86              // less than $86 (voice off)
-009e: d8          JR      $00B7              // no
+009c: 37 86       LTI     A,$86              // voice off?
+009e: d8          JR      $00B7              // no, handle sustain
 009f: 66 76       SUI     A,$76              // get voice number
-00a1: 1f          MOV     L,A                
+00a1: 1f          MOV     L,A                // $08-$0d
 00a2: 6e 00       MVI     H,$00              // hl now points to the inverted mask table
 00a4: 2b          LDAX    (HL)               // fetch mask in A
 00a5: 74 88 10    ANAW    $FF10_noteGate     // AND it with the note flags
@@ -174,26 +174,26 @@ handle a value byte
 00cb: 37 a4       LTI     A,$A4              // no commands above $A4 so return
 00cd: 4e 3a       JRE     $0109_retSerialIsr
 00cf: 27 8d       GTI     A,$8D              // $88-$8d are voice on, greater?
-00d1: 4e 3a       JRE     $010d_voiceOn              // no, handle voice on
+00d1: 4e 3a       JRE     $010d_voiceOn      // no, handle voice on
 00d3: 66 8e       SUI     A,$8E              // yes, get the control value
 00d5: 48 25       SLL     A                  // double it
-okay the next two instructions are fun
-TABLE will return the value at PC + A + 1 in BC
-JB will then jump to BC
+// okay the next two instructions are fun
+// TABLE will return the value at PC + A + 1 in BC
+// JB will then jump to BC
 00d7: 48 a8       TABLE   
 00d9: 21          JB   
   
-this table then holds the addresses of the routines to handle incoming parameter values
-these are in the same order they appear in sysex, which makes life easier
+// this table then holds the addresses of the routines to handle incoming parameter values
+// these are in the same order they appear in sysex, which makes life easier
 00da: 014f 0184 0198
 00e0: 0200 023a 01ab 01c8 01cc 01d0 01af 01b3
 00f0: 01b7 01d4 01e2 01ed 01c4 01e9 01c0 0223
 0100: 0227 01a7 0246 
 
-return from interrupt after handling value
-this increments the command byte implementing a kind of "running status"
-so we can just blast patch values at the voice CPU and have it update them all
-or send an individual single value
+// return from interrupt after handling value
+// this increments the command byte implementing a kind of "running status"
+// so we can just blast patch values at the voice CPU and have it update them all
+// or send an individual single value
 0106: 20 36       INRW    $FF36_cmdByte
 0108: 00          NOP                        // INRW might skip
 0109: 10          EXA     
@@ -201,8 +201,8 @@ or send an individual single value
 010b: aa          EI      
 010c: 62          RETI    
 
-voice on commands
-command in A, note value in D
+// voice on commands
+// command in A, note value in D
 010d: 1a          MOV     B,A                // save command
 010e: 66 76       SUI     A,$76              // form offset to bitmask table
 0110: 1f          MOV     L,A

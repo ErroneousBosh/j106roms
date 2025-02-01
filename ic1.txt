@@ -1270,7 +1270,10 @@ $087e_sendValue
 08b7: c3          JR      $08BB                  // no
 08b8: a2          POP     DE                     // restore and return
 08b9: a3          POP     HL
-08ba: b8          RET     
+08ba: b8          RET
+
+// this is interesting
+// if a pot value is edited, the upper bit is set and the manual LEDs are set on?
 08bb: 7d 5b       CALF    $0D5B_dpOn                  // enable decimal points
 08bd: 0b          MOV     A,C                    // set top bit of value
 08be: 17 80       ORI     A,$80
@@ -1293,31 +1296,32 @@ $087e_sendValue
 08d5: b8          RET
 
 // send single value sysex
+// called with the parameter address in E and the value in C
 08d6_send1Sysex
-08d6: 6c 32       MVI     D,$32
+08d6: 6c 32       MVI     D,$32                 // sysex "control change"
 08d8: 79 15       CALF    $0915_sendSysexHeader
-08da: 0d          MOV     A,E
-08db: 66 90       SUI     A,$90
-08dd: 07 7f       ANI     A,$7F
-08df: 79 e8       CALF    $09E8_sendToTx
-08e1: 0b          MOV     A,C
+08da: 0d          MOV     A,E                   // get the parameter
+08db: 66 90       SUI     A,$90                 // turn the patchram address into sysex param number
+08dd: 07 7f       ANI     A,$7F                 // just in case this goes wrong mask off the top bit
+08df: 79 e8       CALF    $09E8_sendToTx       
+08e1: 0b          MOV     A,C                   // now the value
 08e2: 79 e8       CALF    $09E8_sendToTx
-08e4: 69 f7       MVI     A,$F7
+08e4: 69 f7       MVI     A,$F7                 // end of sysex
 08e6: 79 e6       CALF    $09E6_setRunningStatus
 08e8: b8          RET
 
-send sysex header for Manual mode
-08e9: 6c 31       MVI     D,$31
+// send sysex header for Manual mode
+08e9: 6c 31       MVI     D,$31                 // manual mode message
 08eb: 79 15       CALF    $0915_sendSysexHeader
 08ed: 69 00       MVI     A,$00
-08ef: c6          JR      $08F6
+08ef: c6          JR      $08F6                 // jump ahead to send full patch
 
-sendSysexPatch
+// sendSysexPatch
 08f0: 6c 30       MVI     D,$30
 08f2: 79 15       CALF    $0915_sendSysexHeader
-08f4: 79 36       CALF    $0936
-08f6: 79 e8       CALF    $09E8_sendToTx
-08f8: 6a 0f       MVI     B,$0F
+08f4: 79 36       CALF    $0936                 // get the current patch number
+08f6: 79 e8       CALF    $09E8_sendToTx        // send it
+08f8: 6a 0f       MVI     B,$0F                 // 16 bytes
 08fa: 34 90 ff    LXI     HL,$FF90_patchRam
 08fd: 2d          LDAX    (HL+)
 08fe: 07 7f       ANI     A,$7F
@@ -1334,16 +1338,17 @@ sendSysexPatch
 0912: 79 e8       CALF    $09E8_sendToTx
 0914: b8          RET
 
-sendSysexHeader
-0915: 69 f9       MVI     A,$F9
-0917: 79 e8       CALF    $09E8_sendToTx
-0919: 69 f0       MVI     A,$F0
+// sendSysexHeader
+// called with the message type in D
+0915: 69 f9       MVI     A,$F9                 // select MIDI port
+0917: 79 e8       CALF    $09E8_sendToTx           
+0919: 69 f0       MVI     A,$F0                 // sysex header
 091b: 79 e6       CALF    $09E6_setRunningStatus
-091d: 69 41       MVI     A,$41
+091d: 69 41       MVI     A,$41                 // Roland
 091f: 79 e8       CALF    $09E8_sendToTx
-0921: 0c          MOV     A,D
+0921: 0c          MOV     A,D                   // message type in D
 0922: 79 e8       CALF    $09E8_sendToTx
-0924: 01 bd       LDAW    $FFBD_midiChannel
+0924: 01 bd       LDAW    $FFBD_midiChannel     // channel for sysex
 0926: 79 e8       CALF    $09E8_sendToTx
 0928: b8          RET
 
@@ -1356,7 +1361,8 @@ send Program Change message over MIDI
 0933: 79 e8       CALF    $09E8_sendToTx
 0935: b8          RET
 
-calculate patch number for MIDI
+// calculate patch number for MIDI
+// returns MIDI number for currently-selected patch in A
 0936: 01 bb       LDAW    $FFBB_patch
 0938: 51          DCR     A
 0939: 1b          MOV     C,A
@@ -1364,18 +1370,19 @@ calculate patch number for MIDI
 093c: 66 10       SUI     A,$10
 093e: 48 21       SLR     A
 0940: 60 9b       ORA     A,C
-0942: 5e c8       BIT     6,$FFC8_ledCol3
+0942: 5e c8       BIT     6,$FFC8_ledCol3   // bank A or B
 0944: 17 40       ORI     A,$40
 0946: b8          RET
 
-send E followed by (DE) to module board
-0947: 69 fd       MVI     A,$FD // select module board
+// send a command byte and corresponding value to module board
+// called with the patchram lower byte in E
+0947: 69 fd       MVI     A,$FD             // select module board
 0949: 79 e8       CALF    $09E8_sendToTx
-094b: 0d          MOV     A,E
+094b: 0d          MOV     A,E               // patchram address lower byte is also the command to the voice board
 094c: 79 e8       CALF    $09E8_sendToTx
-094e: 2a          LDAX    (DE)
-094f: 07 7f       ANI     A,$7F
-0951: 3a          STAX    (DE)
+094e: 2a          LDAX    (DE)              // value
+094f: 07 7f       ANI     A,$7F             // mask off upper bit which may be set if it's been changed
+0951: 3a          STAX    (DE)              // save it back, it's been sent
 0952: 79 e8       CALF    $09E8_sendToTx
 0954: b8          RET
 
@@ -2148,8 +2155,8 @@ $0cd0_changePatch
 0cee: 7c 29       CALF    $0C29_sw2ToModule              // send switches2 to module
 0cf0: b8          RET
 
-transmit patch bytes to module board
-decodes bit 7 into C and returns it to send to the switches
+// transmit patch bytes to module board
+// decodes bit 7 into C and returns it to send to the switches
 0cf1: 6a 07       MVI     B,$07      // seven bits
 0cf3: 6b 00       MVI     C,$00      // clear
 0cf5: 2d          LDAX    (HL+)      // get byte
@@ -2184,7 +2191,7 @@ decodes bit 7 into C and returns it to send to the switches
 0d22: 7c 93       CALF    $0C93                 // blank decimal points
 0d24: b8          RET
 
-encode switches byte into upper bits?
+// encode switches byte into upper bits of patch data
 0d25: 6a 07       MVI     B,$07
 0d27: 2c          LDAX    (DE+)
 0d28: 07 7f       ANI     A,$7F
@@ -2210,8 +2217,8 @@ encode switches byte into upper bits?
 0d42: 63 c6       STAW    $FFC6_rightDigit
 0d44: b8          RET
 
-look up digit in table
-called with value in A to show on LED
+// look up digit in table
+// called with value in A to show on LED
 0d45: 34 50 00    LXI     HL,$0050   // bitmap
 0d48: 1b          MOV     C,A        // save
 0d49: 48 21       SLR     A
@@ -2226,7 +2233,8 @@ called with value in A to show on LED
 0d58: 63 c6       STAW    $FFC6_rightDigit      // store
 0d5a: b8          RET
 
-switch on decimal points
+// switch on decimal points
+0D5B_dpOn:
 0d5b: 15 c5 10    ORIW    $FFC5_leftDigit_leftDigit,$10
 0d5e: 15 c6 10    ORIW    $FFC6_rightDigit,$10
 0d61: b8          RET
