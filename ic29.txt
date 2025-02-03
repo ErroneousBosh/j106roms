@@ -556,7 +556,7 @@ here's the main loop
 0349: 48 a0       DSLR    EA
 034b: 48 a0       DSLR    EA
 034d: 48 a0       DSLR    EA
-034f: 48 95       STEAX   (HL++)                     // save it in lfoToPitch 
+034f: 48 95       STEAX   (HL++)                     // save it in lfoToPitch and point HL and lfoToCutoff
 0351: a1          POP     BC                         // get the envelope back
 0352: 01 48       LDAW    $FF48_lfoToVcf             // final LFO VCF mod value
 0354: 48 2e       MUL     B                 
@@ -570,7 +570,7 @@ here's the main loop
 0361: 48 2e       MUL     B
 0363: 70 43       EADD    EA,C
 0365: 48 a0       DSLR    EA
-0367: 48 93       STEAX   (HL)                        // save in lfotoCutoff
+0367: 48 93       STEAX   (HL)                        // save in lfoToCutoff
 0369: 4e 36       JRE     $03A1                       // jump ahead to the next DAC output
 
 // calculate the LFO onset delay envelope
@@ -632,23 +632,28 @@ here's the main loop
 03d0: 74 c5       DADD    EA,BC
 03d2: 24 6f ff    LXI     DE,$FF6F_tuneLfoBend       // basic pitch offset
 03d5: 48 92       STEAX   (DE)
+
+// now the individual voices need to be calculated
+// this will take the target pitch for each note at $FF09-$FF0E
+// and the current fractional pitch at $FF71-$FF7C
 03d7: 71 0f 00    MVIW    $FF0F_voicePtr,$00         // first voice
-03da: 24 71 ff    LXI     DE,$FF71_notePitchFrac     // now compute the portamento
-03dd: 34 09 ff    LXI     HL,$FF09_voice1Note
+03da: 24 71 ff    LXI     DE,$FF71_notePitchFrac     // table of calculated pitch of the note
+03dd: 34 09 ff    LXI     HL,$FF09_voice1Note        // table of MIDI notes
 03e0: 48 82       LDEAX   (DE)                       // fetch the current voice tuning
 03e2: 2d          LDAX    (HL+)                      // and the desired note
 03e3: 1a          MOV     B,A                        
 03e4: 6b 00       MVI     C,$00                      // BC now holds the desired note pitch, no fraction
-03e6: 01 7d       LDAW    $FF7D_portaCoeff           // and the portament amount
-03e8: 77 00       EQI     A,$00                      // if it's zero skip
+03e6: 01 7d       LDAW    $FF7D_portaCoeff           // read from table given the pot value
+03e8: 77 00       EQI     A,$00                      // if it's zero skip the calculation
 03ea: ca          JR      $03F5                      // actually do the portamento
 03eb: a5          DMOV    EA,BC                      // just put the pitch straight in
-03ec: 48 94       STEAX   (DE++)                     // and save it
+03ec: 48 94       STEAX   (DE++)                     // and save it, pointing to the next entry in the table
 03ee: 20 0f       INRW    $FF0F_voicePtr             // next voice
 03f0: 75 0f 06    EQIW    $FF0F_voicePtr,$06         // done all six?
 03f3: ec          JR      $03E0                      // nope, back around to porta the next one
 03f4: d2          JR      $0407                      // jump on forwards, nothing more to do
-calculate portamento
+
+// calculate portamento
 03f5: 74 ed       DNE     EA,BC                      // if the porta pitch is equal to the desired pitch
 03f7: f4          JR      $03EC                      // jump back and save it
 03f8: 74 ad       DGT     EA,BC                      // greater?
@@ -662,25 +667,28 @@ calculate portamento
 0405: a5          DMOV    EA,BC                      // it isn't, we went too far, set to the target pitch
 0406: e5          JR      $03EC                      // ... jump back and save
 
-set sub osc level
+// set sub osc level
 0407: 69 06       MVI     A,$06
 0409: 34 3b ff    LXI     HL,$FF3B_subOscLev
 040c: 48 83       LDEAX   (HL)
 040e: 78 2f       CALF    $082F_loadDac
-0410: 64 08 ef    ANI     PA,$EF                     // IC24 VCO Ramp CV mux
+0410: 64 08 ef    ANI     PA,$EF                     // IC24 VCO Ramp CV mux, pin 2 goes to the sub osc level
 
-now set the oscillator pitches
+// now set the oscillator pitches
 0413: 71 0f 00    MVIW    $FF0F_voicePtr,$00     // first voice
 0416: 71 34 01    MVIW    $FF34_actvVoiceBit,$01 // voice selector bit
-0419: 24 71 ff    LXI     DE,$FF71_notePitchFrac // first notepitch amount
-041c: 48 84       LDEAX   (DE++)                 // EA contains pitch, bump DE
-041e: 70 1f 6f ff LBCD    $FF6F_tuneLfoBend      // precalculated pitch offest
+0419: 24 71 ff    LXI     DE,$FF71_notePitchFrac // voice calculated pitch table
+041c: 48 84       LDEAX   (DE++)                 // get the pitch for the voice, point DE to the next entry
+041e: 70 1f 6f ff LBCD    $FF6F_tuneLfoBend      // precalculated pitch offset
 0422: 74 c5       DADD    EA,BC                  // add it
-0424: 09          MOV     A,EAL                  
-0425: 63 6e       STAW    $FF63_midiModDepth     // save the fractional amount for interpolation, this variable is not needed now
+0424: 09          MOV     A,EAL
+
+// this variable gets overwritten periodically
+// right now we can clobber it because it's done its job
+0425: 63 6e       STAW    $FF63_midiModDepth     // save the fractional amount for interpolation, mod depth is not needed now
 0427: 08          MOV     A,EAH                  // get the note number
 0428: 27 2f       GTI     A,$2F                  // greater than 47
-042a: 4e 79       JRE     $04A5                  // no
+042a: 4e 79       JRE     $04A5                  // no, clamp
 042c: 37 97       LTI     A,$97                  // less than 151
 042e: 4e 7c       JRE     $04AC                  // no
 0430: 66 30       SUI     A,$30                  // subtract 48 
@@ -751,16 +759,19 @@ now set the oscillator pitches
 049e: 75 0f 06    EQIW    $FF0F_voicePtr,$06     // done all six?
 04a1: 4f 79       JRE     $041C                  // no, go back again
 04a3: 4e 30       JRE     $04D5                  // yes, go on and compute VCF values
-upper and lower limits for note number
-too low, zero out fractional part and note number
+
+// upper and lower limits for note number
+// too low, zero out fractional part and note number
+
 04a5: 71 6e 00    MVIW    $FF63_midiModDepth,$00
 04a8: 69 00       MVI     A,$00
 04aa: 4f 86       JRE     $0432                      // go back
-too high, zero out fractional part and set maximum note number
+// too high, zero out fractional part and set maximum note number
 04ac: 71 6e 00    MVIW    $FF63_midiModDepth,$00
 04af: 69 66       MVI     A,$66
 04b1: 4f 7f       JRE     $0432                      // go back
-reset voice oscillator
+
+// reset voice oscillator
 04b3: 16 ff       XRI     A,$FF                      // mask off reset bit
 04b5: 74 88 00    ANAW    $FF00_resetVoiceBits
 04b8: 63 00       STAW    $FF00_resetVoiceBits
