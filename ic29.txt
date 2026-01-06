@@ -339,7 +339,7 @@ it is looked up later
 01e6: 3b          STAX    (HL)
 01e7: 4f 1d       JRE     $0106_retSerialValue
 
-release and decay are looked up in a table
+// release and decay are looked up in a table
 01e9: 34 25 ff    LXI     HL,$FF25_envRlsCoeff
 01ec: c3          JR      $01F0
 01ed: 34 21 ff    LXI     HL,$FF21_envDcyCoeff
@@ -352,28 +352,29 @@ release and decay are looked up in a table
 01fb: 48 93       STEAX   (HL)
 01fd: 54 06 01    JMP     $0106_retSerialValue
 
-LFO Delay requires a bit of special attention
-0200: 0c          MOV     A,D
+// LFO Delay requires a bit of special attention
+// called with the pot value in D
+0200: 0c          MOV     A,D           // save D for later
 0201: 48 21       SLR     A
 0203: 48 21       SLR     A
 0205: 48 21       SLR     A
-0207: 07 0e       ANI     A,$0E
-0209: 34 30 0b    LXI     HL,$0B30_lfoDelayTbl1
-020c: 48 8c       LDEAX   (HL+A)
-020e: 34 6c ff    LXI     HL,$FF6C_lfoHoldoffCoeff
-0211: 48 93       STEAX   (HL)
-0213: 0c          MOV     A,D
-0214: 48 25       SLL     A
-0216: 34 60 0b    LXI     HL,$0B60_envAtkTbl
-0219: 48 8c       LDEAX   (HL+A)
-021b: 24 58 ff    LXI     DE,$FF58_lfoDelayCoeff
-021e: 48 92       STEAX   (DE)
+0207: 07 0e       ANI     A,$0E         // now a value from $00 to $0e, or 0 to 7 shifted left one bit
+0209: 34 30 0b    LXI     HL,$0B30_LfoDelayRampTbl // lookup table
+020c: 48 8c       LDEAX   (HL+A)                // add on the offset
+020e: 34 6c ff    LXI     HL,$FF6C_lfoAttackRate
+0211: 48 93       STEAX   (HL)                  // save it for later
+0213: 0c          MOV     A,D                   // get pot value back
+0214: 48 25       SLL     A                     // shift left one bit, to form an address with...
+0216: 34 60 0b    LXI     HL,$0B60_envAtkTbl    // the envelope attack rate table
+0219: 48 8c       LDEAX   (HL+A)                // which we look up...
+021b: 24 58 ff    LXI     DE,$FF58_lfoHoldoffRate
+021e: 48 92       STEAX   (DE)                  // and save for the calculation
 0220: 54 06 01    JMP     $0106_retSerialValue
 
-negative bend value
+// negative bend value
 0223: 05 1e ef    ANIW    $FF1E_flags1,$EF // bend negative
 0226: c3          JR      $022A
-positive bend value
+// positive bend value
 0227: 15 1e 10    ORIW    $FF1E_flags1,$10 // bend positive
 022a: 0c          MOV     A,D
 022b: 67 00       NEI     A,$00          // bend is zero?
@@ -384,7 +385,7 @@ positive bend value
 0234: 71 05 01    MVIW    $FF05_bendPolarity,$01
 0237: 54 06 01    JMP     $0106_retSerialValue
 
-DCO LFO depth is looked up in a table of 8-bit values
+// DCO LFO depth is looked up in a table of 8-bit values
 023a: 0c          MOV     A,D
 023b: 34 80 0a    LXI     HL,$0A80_lfoDepthTbl
 023e: 24 49 ff    LXI     DE,$FF49_lfoToPitchScaler
@@ -392,7 +393,7 @@ DCO LFO depth is looked up in a table of 8-bit values
 0242: 3a          STAX    (DE)
 0243: 54 06 01    JMP     $0106_retSerialValue
 
-Set DAC to Zero command for test mode
+// Set DAC to Zero command for test mode
 0246: 5e 37       BIT     6,$FF37_switch2
 0248: 54 09 01    JMP     $0109_retSerialIsr     // test mode not armed
 024b: 0c          MOV     A,D
@@ -447,7 +448,7 @@ Set DAC to Zero command for test mode
 027e: 00          NOP     
 027f: 00          NOP     
 
-cold start
+// cold start
 0280: 69 0e       MVI     A,$0E         // RAM on, 16kB mode, PF6-7 port mode
 0282: 4d d0       MOV     MM,A
 0284: 68 ff       MVI     V,$FF         // vector register for "working register" instructions
@@ -503,7 +504,7 @@ cold start
 02e8: 64 06 04    MVI     MKH,$04               // mask serial transmit interrupt, unmask serial receive and AD interrupts
 02eb: aa          EI
 
-here's the main loop
+// here's the main loop
 02ec: 01 46       LDAW    $FF46_ic40Latch
 02ee: 70 79 00 30 MOV     ($3000),A          // set chorus and HPF outputs
 02f2: 58 1e       BIT     0,$FF1E_flags1     // sustained?
@@ -524,7 +525,7 @@ here's the main loop
 
 // start LFO envelope calculation
 030d: 45 11 3f    ONIW    $FF11_voiceRun,$3F        // are any voices started
-0310: 4e 59       JRE     $036B                     // no
+0310: 4e 59       JRE     $036B                     // no, set bit 3 in flags, jump back to 323
 0312: 5b 1e       BIT     3,$FF1E_flags1            // yes but check if we've already started the LFO delay
 0314: ce          JR      $0323                     // bit 3 is clear
 0315: 14 00 00    LXI     BC,$0000                  // bit 3 is set
@@ -538,7 +539,7 @@ here's the main loop
 032b: 6a ff       MVI     B,$FF                      // maximum LFO amount
 
 // perform the LFO amount calculations
-032d: b1          PUSH    BC
+032d: b1          PUSH    BC                         // called with onset attack value in B
 032e: 01 49       LDAW    $FF49_lfoToPitchScaler     // this is the value from the lookup table
 0330: 48 2e       MUL     B                          
 0332: 08          MOV     A,EAH                      
@@ -574,23 +575,27 @@ here's the main loop
 0369: 4e 36       JRE     $03A1                       // jump ahead to the next DAC output
 
 // calculate the LFO onset delay envelope
-036b: 15 1e 08    ORIW    $FF1E_flags1,$08
+036b: 15 1e 08    ORIW    $FF1E_flags1,$08              // hangtime flag
 036e: 4f b3       JRE     $0323
-0370: 24 56 ff    LXI     DE,$FF56_lfoHoldOff
-0373: 48 82       LDEAX   (DE)
-0375: 70 1f 58 ff LBCD    $FF58_lfoDelayCoeff
-0379: 74 c5       DADD    EA,BC
-037b: 48 92       STEAX   (DE)
-037d: 08          MOV     A,EAH
-037e: 57 c0       OFFI    A,$C0
-0380: c4          JR      $0385
-0381: 6a 00       MVI     B,$00
-0383: 4f a8       JRE     $032D
 
+// holdoff hangtime calculation
+0370: 24 56 ff    LXI     DE,$FF56_lfoHoldOff   // current hangtime value
+0373: 48 82       LDEAX   (DE)
+0375: 70 1f 58 ff LBCD    $FF58_lfoHoldoffRate
+0379: 74 c5       DADD    EA,BC                 // add in the hangtime speed
+037b: 48 92       STEAX   (DE)                  // save it back
+037d: 08          MOV     A,EAH
+037e: 57 c0       OFFI    A,$C0                 // greater than $3fff?
+0380: c4          JR      $0385                 // yes, go ahead to the envelope
+0381: 6a 00       MVI     B,$00                 // no, LFO depth = 0
+0383: 4f a8       JRE     $032D                 // proceed with the LFO amount calculation
+
+// envelope attack ramp
+// goes from 0 to $ff, output in B
 0385: 15 1e 02    ORIW    $FF1E_flags1,$02
 0388: 34 5a ff    LXI     HL,$FF5A_lfoDelayEnv
 038b: 48 83       LDEAX   (HL)
-038d: 70 1f 6c ff LBCD    $FF6C_lfoHoldoffCoeff
+038d: 70 1f 6c ff LBCD    $FF6C_lfoAttackRate
 0391: 74 a5       DADDNC  EA,BC
 0393: c6          JR      $039A
 0394: 48 93       STEAX   (HL)
@@ -692,15 +697,17 @@ here's the main loop
 042c: 37 97       LTI     A,$97                  // less than 151
 042e: 4e 7c       JRE     $04AC                  // no
 0430: 66 30       SUI     A,$30                  // subtract 48 
-0432: 48 25       SLL     A                      // double it
+
+// here's where the "overflow" routines return to, no need to subtract the 48
+0432: 48 25       SLL     A                      // double it because we are pointing to a two-byte table
 0434: 44 60 0e    LXI     EA,$0E60_noteCvDacTbl  // point to the table of CV DAC values
 0437: 70 41       EADD    EA,A                   // add the note...
-0439: b4          PUSH    EA                     // .. and save it on the stack for now
+0439: b4          PUSH    EA                     // .. and save the address on the stack for now
 043a: 44 30 0f    LXI     EA,$0F30_noteClkDivTbl // point to the table of 8253 divider values
 043d: 70 41       EADD    EA,A                   // add the note...
 043f: b7          DMOV    HL,EA
-0440: 48 8f 02    LDEAX   (HL+$02)               // get the value of the note above
-0443: b5          DMOV    BC,EA                  // into BC
+0440: 48 8f 02    LDEAX   (HL+$02)               // get the value of the note above...
+0443: b5          DMOV    BC,EA                  // ... into BC
 0444: 48 83       LDEAX   (HL)                   // get this note
 0446: b4          PUSH    EA                     // save it on the stack for later
 0447: 74 e5       DSUB    EA,BC
@@ -720,6 +727,8 @@ here's the main loop
 045d: 01 34       LDAW    $FF34_actvVoiceBit     // voice bit
 045f: 74 d8 00    OFFAW   $FF00_resetVoiceBits   // does it need reset
 0462: 4e 4f       JRE     $04B3                  // yes, reset it
+
+// load the counter
 0464: ba          DI                             // this could go squint if an interrupt happens right now
 0465: 34 50 0b    LXI     HL,$0B50               // get address for clock chip
 0468: ad          LDAX    (HL+B)
@@ -731,7 +740,7 @@ here's the main loop
 046f: 3b          STAX    (HL)                   // send it to the chip
 0470: aa          EI                             // phew
 0471: a3          POP     HL                     // the DAC table address that was in EA, get it in HL
-0472: 48 85       LDEAX   (HL++)                 // load into EA, and increment HL to next entry
+0472: 48 85       LDEAX   (HL++)                 // load the value it points at in EA, and increment HL to next entry
 0474: b5          DMOV    BC,EA                  // copy to BC
 0475: b4          PUSH    EA                     // save on stack too
 0476: 48 83       LDEAX   (HL)                   // get the value after it
@@ -754,7 +763,7 @@ here's the main loop
 0493: 64 08 ef    ANI     PA,$EF                 // IC24 VCO Ramp CV mux
 0496: 01 34       LDAW    $FF34_actvVoiceBit     // voice bit
 0498: 48 25       SLL     A                      // move to next voice
-049a: 63 34       STAW    $FF34_actvVoiceBit                  // save it back
+049a: 63 34       STAW    $FF34_actvVoiceBit     // save it back
 049c: 20 0f       INRW    $FF0F_voicePtr         // next voice
 049e: 75 0f 06    EQIW    $FF0F_voicePtr,$06     // done all six?
 04a1: 4f 79       JRE     $041C                  // no, go back again
@@ -762,7 +771,6 @@ here's the main loop
 
 // upper and lower limits for note number
 // too low, zero out fractional part and note number
-
 04a5: 71 6e 00    MVIW    $FF63_midiModDepth,$00
 04a8: 69 00       MVI     A,$00
 04aa: 4f 86       JRE     $0432                      // go back
@@ -785,18 +793,18 @@ here's the main loop
 04c8: 3b          STAX    (HL)                       // send the reset command
 04c9: 4f 9a       JRE     $0465                      // jump back and program the clock chip
 
-I guess this is to fit an extra instruction in
-seems odd, only ever jumped to from the VCF calculations
+// I guess this is to fit an extra instruction in
+// seems odd, only ever jumped to from the VCF calculations
 04cb: 74 c5       DADD    EA,BC
 04cd: db          JR      $04E9
 
-to do with calculating VCF, does it overflow?
+// to do with calculating VCF, does it overflow?
 04ce: 74 a5       DADDNC  EA,BC
 04d0: 71 6a 00    MVIW    $FF6A_vcfOverflow1,$00
 04d3: 4e 21       JRE     $04F6
 
-calculate VCF amounts
-04d5: 71 6a 00    MVIW    $FF6A_vcfOverflow1,$00      // zero out overflow flag
+// calculate VCF amounts
+04d5: 71 6a 00    MVIW    $FF6A_vcfOverflow1,$00     // zero out overflow flag
 04d8: 70 1f 3d ff LBCD    $FF3D_vcfCutoff            // cutoff knob scaled to $0000-$3f80
 04dc: a5          DMOV    EA,BC
 04dd: 70 1f 53 ff LBCD    $FF53_vcfLfoSignal
@@ -863,7 +871,7 @@ calculate decay phase for envelope
 055f: 78 3d       CALF    $083D_calcDecay
 0561: 4e 2d       JRE     $0590
 //
-attack phase
+// attack phase
 0563: 01 34       LDAW    $FF34_actvVoiceBit
 0565: 16 ff       XRI     A,$FF
 0567: 74 88 08    ANAW    $FF08_dcyPhase
@@ -885,7 +893,7 @@ attack phase
 0589: 01 34       LDAW    $FF34_actvVoiceBit
 058b: 74 98 08    ORAW    $FF08_dcyPhase             // and decay phase bits set
 058e: 63 08       STAW    $FF08_dcyPhase
-go on to do next envelope
+// go on to do next envelope
 0590: 48 9b 02    STEAX   (DE+$02)                   // save
 0593: 48 84       LDEAX   (DE++)                     // get value back, increment DE
 0595: 75 0f 00    EQIW    $FF0F_voicePtr,$00         // if this is our first time round the loop...
@@ -896,10 +904,10 @@ go on to do next envelope
 05a0: 78 2f       CALF    $082F_loadDac
 05a2: 64 08 df    ANI     PA,$DF                     // IC23 VCF CV mux
 05a5: da          JR      $05C0
-//
-envelope/gate settings
-05a6: 5a 37       BIT     2,$FF37_switch2
-05a8: c9          JR      $05B2
+
+// envelope/gate settings
+05a6: 5a 37       BIT     2,$FF37_switch2           // envelope/gate switch
+05a8: c9          JR      $05B2                     // gate mode
 05a9: 01 0f       LDAW    $FF0F_voicePtr
 05ab: 51          DCR     A
 05ac: 78 2f       CALF    $082F_loadDac
@@ -1033,8 +1041,10 @@ calculate pitch bend
 0696: 74 c5       DADD    EA,BC                  // add, now it's multiplied by 0.75
 0698: 0c          MOV     A,D                    // get original back
 0699: 70 41       EADD    EA,A                   // multipled by 1.75
-okay this is one of those things in disassemblies where the "what" is obvious
-but the "why" remains elusive
+
+// this shifts four bits out of EA and into A
+// after this EA will contain the normalised fraction
+// and A will contain the semitone
 069b: 48 2a       CLC                            // clear carry                    
 069d: 69 00       MVI     A,$00                  // zero out accumulator
 069f: 48 a4       DSLL    EA                     // shift top bit into carry
@@ -1047,7 +1057,7 @@ but the "why" remains elusive
 06ad: 48 35       RLL     A                      // and A contains the top four bits
 06af: 63 69       STAW    $FF69                  // save A
 06b1: 48 93       STEAX   (HL)                   // save EA at FF67/FF68
-wait for DAC conversion to be complete
+// wait for DAC conversion to be complete
 06b3: ba          DI      
 06b4: 48 48       SKIT    FAD                    // 
 06b6: 00          NOP     
@@ -1108,7 +1118,7 @@ wait for DAC conversion to be complete
 0721: 15 1e 80    ORIW    $FF1E_flags1,$80
 0724: 4f 8d       JRE     $06B3
 
-this seems to "de-click" turning on the modwheel
+// this seems to "de-click" turning on the modwheel
 0726: 01 8b       LDAW    $FF8B_dacLfoSens
 0728: 74 a8 7e    GTAW    $FF7E_modSwDeclick
 072b: 4f d1       JRE     $06FE
@@ -1118,6 +1128,7 @@ this seems to "de-click" turning on the modwheel
 0733: 63 7e       STAW    $FF7E_modSwDeclick
 0735: 4f c7       JRE     $06FE
 
+// jumped to after the ADC conversion
 0737: a2          POP     DE                     // get back the envelope address
 0738: 48 82       LDEAX   (DE)                   // get the envelope value
 073a: 5a 37       BIT     2,$FF37_switch2        // env/gate switch
@@ -1129,22 +1140,26 @@ this seems to "de-click" turning on the modwheel
 0747: 69 05       MVI     A,$05                  // voice 6 VCA channel
 0749: 78 2f       CALF    $082F_loadDac          
 074b: 64 08 bf    ANI     PA,$BF                 // IC26 VCA CV mux
+
+// run LFO
 074e: 34 4d ff    LXI     HL,$FF4D_lfoVal
 0751: 48 83       LDEAX   (HL)
 0753: 70 1f 4b ff LBCD    $FF4B_lfoRateCoeff
-0757: 58 4a       BIT     0,$FF4A_lfoFlag // rise/fall
+0757: 58 4a       BIT     0,$FF4A_lfoFlag   // bit zero low for rising LFO, high for falling LFO
 0759: 4e 30       JRE     $078B             // rising value
-075b: 74 b5       DSUBNB  EA,BC             // no, falling - if it overflows...
+075b: 74 b5       DSUBNB  EA,BC             // falling - if it overflows...
 075d: 4e 3b       JRE     $079A             // jump ahead and zero the LFO value
-075f: 48 95       STEAX   (HL++)        // store LFO value, point to $FF4F
-0761: 59 4a       BIT     1,$FF4A_lfoFlag // polarity - if it's negative...
+075f: 48 95       STEAX   (HL++)            // store LFO value, point to $FF4F
+
+// handle PWM calculations
+0761: 59 4a       BIT     1,$FF4A_lfoFlag   // polarity - if it's negative...
 0763: 4e 3d       JRE     $07A2             // add on $2000
 0765: b5          DMOV    BC,EA             // it's positive
 0766: 44 00 20    LXI     EA,$2000          //
 0769: 74 e5       DSUB    EA,BC             // subtract it from $2000
 076b: b5          DMOV    BC,EA             // now BC = $3fff - lfo, effectively (probably)
-076c: 58 37       BIT     0,$FF37_switch2   // fixed PWM
-076e: 14 ff 3f    LXI     BC,$3FFF          // yes, just set BC to $3fff
+076c: 58 37       BIT     0,$FF37_switch2   // PWM manual/LFO switch
+076e: 14 ff 3f    LXI     BC,$3FFF          // PWM set to manual, just set BC to $3fff
 0771: 01 47       LDAW    $FF47_pwmDepth    // multiply by PWM amount pot (limited to 0-100 by R5/R6)
 0773: 48 2f       MUL     C
 0775: 08          MOV     A,EAH
@@ -1155,10 +1170,12 @@ this seems to "de-click" turning on the modwheel
 077d: b5          DMOV    BC,EA
 077e: 44 ff 3f    LXI     EA,$3FFF          // subtract the result from $3fff
 0781: 74 e5       DSUB    EA,BC
-0783: 5e 1e       BIT     6,$FF1E_flags1     // square off/on
+0783: 5e 1e       BIT     6,$FF1E_flags1    // square off/on
 0785: 44 00 00    LXI     EA,$0000          // square off? Just set PW to 0!
-0788: 48 93       STEAX   (HL)
+0788: 48 93       STEAX   (HL)              // store at $FF4F
 078a: de          JR      $07A9
+
+// increment rising LFO and clamp
 078b: 74 c5       DADD    EA,BC             // increment LFO
 078d: 08          MOV     A,EAH             
 078e: 47 e0       ONI     A,$E0             // if EA < $2000
@@ -1167,19 +1184,28 @@ this seems to "de-click" turning on the modwheel
 0795: 20 4a       INRW    $FF4A_lfoFlag     // bump the flag to say we're descending again
 0797: 00          NOP                       // inrw might skip, so place a NOP 
 0798: 4f c5       JRE     $075F             // jump back and store
+
+// decremented LFO below zero
 079a: 44 00 00    LXI     EA,$0000          // lfo value went below zero (overflowed) so zero it
 079d: 20 4a       INRW    $FF4A_lfoFlag     // bump the flag
 079f: 00          NOP                       // inrw might skip, so place a NOP
 07a0: 4f bd       JRE     $075F             // jump bank and store
+
+// add on $2000 as part of LFO PWM calculation
 07a2: 14 00 20    LXI     BC,$2000          //
 07a5: 74 c5       DADD    EA,BC
-07a7: 4f c2       JRE     $076B
+07a7: 4f c2       JRE     $076B             // jump back to PWM calculation
+
+// after the LFO is done, noise pot
 07a9: 34 39 ff    LXI     HL,$FF39_noiseLevel
 07ac: 48 83       LDEAX   (HL)
-07ae: 69 07       MVI     A,$07                  // noise VCA level
+07ae: 69 07       MVI     A,$07                 // noise VCA level
 07b0: 78 2f       CALF    $082F_loadDac
-07b2: 64 08 bf    ANI     PA,$BF                 // IC26 VCA CV mux
-07b5: 54 ec 02    JMP     $02EC
+07b2: 64 08 bf    ANI     PA,$BF                // IC26 VCA CV mux
+07b5: 54 ec 02    JMP     $02EC                 // last one done, loop back to the beginning
+
+// enable test mode
+// it looks like there may have been a plan to have a jump table to more tests
 07b8: 01 01       LDAW    $FF01_testMode
 07ba: 37 01       LTI     A,$01
 07bc: 54 80 02    JMP     $0280
@@ -1188,7 +1214,8 @@ this seems to "de-click" turning on the modwheel
 07c3: 21          JB      
 07c4: c6 07       // only table entry is 07c6
 
-which is right here, zero out the DAC for test mode
+// which is right here, zero out the DAC for test mode
+// this will continue in a loop until an interrupt fires
 07c6: 78 51       CALF    $0851_resetBoard
 07c8: 01 46       LDAW    $FF46_ic40Latch
 07ca: 70 79 00 30 MOV     ($3000),A
@@ -1223,9 +1250,9 @@ which is right here, zero out the DAC for test mode
 07fe: 00          NOP     
 07ff: 00          NOP
 
-handle ADC values
-called with address of raw DAC values in HL
-and "processed" values at DE
+// handle ADC values
+// called with address of raw DAC values in HL
+// and "processed" values at DE
 0800: 6b 03       MVI     C,$03      // four values
 0802: 2b          LDAX    (HL)       // get raw value
 0803: 70 b2       SUBNBX  (DE)       // subtract processed value
@@ -1252,8 +1279,8 @@ and "processed" values at DE
 0822: 2a          LDAX    (DE)
 0823: 4f e7       JRE     $080C
 //
-set 8253 mode word
-called with the address of the command register in HL
+// set 8253 mode word
+// called with the address of the command register in HL
 0825: 69 36       MVI     A,$36  // mode word, read/load LSB first, BCD off, Mode 3
 0827: 3b          STAX    (HL)
 0828: 46 40       ADI     A,$40  // $76 = same for counter 1
@@ -1274,10 +1301,10 @@ and the value to set it to in EA
 083a: 4d c2       MOV     PC,A       // lowest two bits not used for DAC
 083c: b8          RET
 //
-envelope decay
-called with the envelope level in BC
-the high byte of the decay time in $FF35
-and the low byte in A
+// envelope decay
+// called with the envelope level in BC
+// the high byte of the decay time in $FF35
+// and the low byte in A
 083d: 48 2e       MUL     B              // high byte of value * low byte of coeff
 083f: 08          MOV     A,EAH          // result in top byte of EA into A
 0840: 1e          MOV     H,A            // save in H
@@ -1293,13 +1320,13 @@ and the low byte in A
 084e: 70 43       EADD    EA,C           // add the second result to ea
 0850: b8          RET     // return with EA = (BC*decay) where decay is a binary fraction
 
-test for "restart voice board" switch sent from assigner
+// test for "restart voice board" switch sent from assigner
 0851: 5e 37       BIT     6,$FF37_switch2
 0853: 54 80 02    JMP     $0280
 0856: b8          RET
 
-delay
-uses very slow DIV instruction in a loop
+// delay
+// uses very slow DIV instruction in a loop
 0857: 6a 03       MVI     B,$03
 0859: 44 10 00    LXI     EA,$0010
 085c: 69 02       MVI     A,$02
@@ -1308,7 +1335,7 @@ uses very slow DIV instruction in a loop
 0861: f7          JR      $0859
 0862: b8          RET  
 
-masses of blank ROM from here up to the tables
+// masses of blank ROM from here up to the tables
 0863: 00          NOP     
 0864: 00          NOP     
 0865: 00          NOP     
@@ -1745,18 +1772,18 @@ masses of blank ROM from here up to the tables
 0ae0: 80 84 88 8c 90 94 98 9c a0 a4 a8 ac b0 b4 b8 bc
 0af0: c0 c4 c8 cc d0 d4 d8 dc e0 e4 e8 ec f0 f8 ff ff
 
-not used, 0x30 bytes of 0 
+// not used, 0x30 bytes of 0 
 0b00: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
 0b10: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
 0b20: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
 
-0B30_lfoDelayTbl1:
+0B30_LfoDelayRampTbl:
 0b30: ffff 0419 020c 015e 0100 0100 0100 0100
 
-voice to clock address lookup table
+// voice to clock address lookup table
 0b50: 20 21 22 10 11 12
 
-CTC programming command for clock chip
+// CTC programming command for clock chip
 0b56: 36 76 b6 36 76 b6
 
 0b5c: 00 00 00 00
