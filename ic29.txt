@@ -638,9 +638,9 @@ it is looked up later
 03d2: 24 6f ff    LXI     DE,$FF6F_tuneLfoBend       // basic pitch offset
 03d5: 48 92       STEAX   (DE)
 
-// now the individual voices need to be calculated
-// this will take the target pitch for each note at $FF09-$FF0E
-// and the current fractional pitch at $FF71-$FF7C
+// portamento calculations
+// for all six notes, add or subtract the porta value
+// until the target note is reached
 03d7: 71 0f 00    MVIW    $FF0F_voicePtr,$00         // first voice
 03da: 24 71 ff    LXI     DE,$FF71_notePitchFrac     // table of calculated pitch of the note
 03dd: 34 09 ff    LXI     HL,$FF09_voice1Note        // table of MIDI notes
